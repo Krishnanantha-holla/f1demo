@@ -1,0 +1,156 @@
+{
+  "drivers": {
+    "1": {
+      "full_name": "Max Verstappen",
+      "championships": 3,
+      "podiums": 98,
+      "wins": 54,
+      "career_points": 2586.5,
+      "bio": "Max Emilian Verstappen, the youngest World Champion in F1 history, redefined dominance with Red Bull Racing. Known for his ruthless aggression, generational talent, and unparalleled car control, he operates as a singular force of nature on the grid."
+    },
+    "44": {
+      "full_name": "Lewis Hamilton",
+      "championships": 7,
+      "podiums": 197,
+      "wins": 103,
+      "career_points": 4640.5,
+      "bio": "Sir Lewis Carl Davidson Hamilton is statistically the greatest Formula 1 driver of all time. Having conquered the sport with Mercedes over a decade, his shock move to Ferrari instantly reshaped the modern narrative. He is a master of race craft, tire management, and wet-weather brilliance."
+    },
+    "16": {
+      "full_name": "Charles Leclerc",
+      "championships": 0,
+      "podiums": 30,
+      "wins": 5,
+      "career_points": 1073,
+      "bio": "Charles Marc Hervé Perceval Leclerc represents the pride of Maranello. Blessed with blistering qualifying pace and a visceral connection to the Ferrari tifosi, Leclerc is the designated chosen one aiming to end Ferrari's decades-long championship drought."
+    },
+    "4": {
+      "full_name": "Lando Norris",
+      "championships": 0,
+      "podiums": 13,
+      "wins": 0,
+      "career_points": 633,
+      "bio": "Lando Norris emerged as McLaren's prodigy, evolving from a raw rookie into a calculating, consistent team leader. His adaptability and sheer speed over one lap make him a perpetual threat for victories."
+    },
+    "14": {
+      "full_name": "Fernando Alonso",
+      "championships": 2,
+      "podiums": 106,
+      "wins": 32,
+      "career_points": 2267,
+      "bio": "Fernando Alonso Díaz is the grid's ultimate gladiator. With a career spanning over two decades, the two-time World Champion's unrelenting race pace, strategic genius, and defensive masterclasses continue to defy age."
+    },
+    "63": {
+      "full_name": "George Russell",
+      "championships": 0,
+      "podiums": 11,
+      "wins": 1,
+      "career_points": 469,
+      "bio": "George Russell assumed the mantle of Mercedes leadership with methodical precision. A former Formula 2 champion, 'Mr. Saturday' brings relentless consistency and analytical intelligence to the pursuit of Silver Arrows supremacy."
+    },
+    "81": {
+      "full_name": "Oscar Piastri",
+      "championships": 0,
+      "podiums": 2,
+      "wins": 0,
+      "career_points": 97,
+      "bio": "Oscar Piastri arrived in F1 with one of the most decorated junior CVs in history. His icy demeanor, staggering adaptability, and immediate pace alongside seasoned veterans marked him instantly as a future World Champion."
+    },
+    "55": {
+      "full_name": "Carlos Sainz",
+      "championships": 0,
+      "podiums": 18,
+      "wins": 2,
+      "career_points": 982.5,
+      "bio": "Carlos Sainz Vázquez de Castro is the grid's premier smooth operator. Renowned for his microscopic technical feedback, race-reading ability, and strategic autonomy, he brings stabilizing intelligence to any garage he inhabits."
+    },
+    "23": {
+      "full_name": "Alexander Albon",
+      "championships": 0,
+      "podiums": 2,
+      "wins": 0,
+      "career_points": 228,
+      "bio": "Alexander Albon reinvented himself at Williams, discovering a profound synergy with the storied team. His heroic defensive drives and ability to extract impossible pace from uncooperative machinery have solidified his reputation as a top-tier talent."
+    },
+    "11": {
+      "full_name": "Sergio Perez",
+      "championships": 0,
+      "podiums": 35,
+      "wins": 6,
+      "career_points": 1486,
+      "bio": "Sergio Michel Pérez Mendoza, Mexico's Minister of Defense, earned his stripes as the ultimate tire whisperer. Partnering Verstappen at Red Bull, he excels at brutal street circuits and masterfully preserving rubber."
+    }
+  },
+  "constructors": {
+    "red_bull": {
+      "full_name": "Red Bull Racing",
+      "championships": 6,
+      "wins": 113,
+      "base": "Milton Keynes, United Kingdom",
+      "bio": "Red Bull Racing disrupted the traditional F1 establishment, blending extreme sports energy with Adrian Newey's aerodynamic sorcery. They operate flawlessly under pressure, defined by aggressive strategies and pit wall perfection."
+    },
+    "mercedes": {
+      "full_name": "Mercedes-AMG Petronas F1 Team",
+      "championships": 8,
+      "wins": 125,
+      "base": "Brackley, United Kingdom",
+      "bio": "The Silver Arrows defined the V6 Turbo-Hybrid era with an unprecedented string of eight consecutive Constructors' Championships. Mercedes represents engineering perfection, relentless optimization, and a historic legacy of dominance."
+    },
+    "ferrari": {
+      "full_name": "Scuderia Ferrari",
+      "championships": 16,
+      "wins": 243,
+      "base": "Maranello, Italy",
+      "bio": "Scuderia Ferrari is the very soul of Formula 1. As the only team to compete in every season since 1950, Maranello bears the unbearable weight of a nation's expectation, fueled by passion, pedigree, and the iconic rosso corsa."
+    },
+    "mclaren": {
+      "full_name": "McLaren Formula 1 Team",
+      "championships": 8,
+      "wins": 183,
+      "base": "Woking, United Kingdom",
+      "bio": "Founded by Bruce McLaren, the Woking-based squad holds one of the most storied pedigrees in motorsport history. Armed with a young, electric driver lineup, they represent a resurgent titan fighting back to the summit of the grid."
+    },
+    "aston_martin": {
+      "full_name": "Aston Martin Aramco F1 Team",
+      "championships": 0,
+      "wins": 0,
+      "base": "Silverstone, United Kingdom",
+      "bio": "Aston Martin brings British spy-thriller elegance to the grid, backed by immense ambition and aggressive facility expansion. The iconic racing green cars aim to convert legacy styling into sheer aerodynamic performance."
+    },
+    "alpine": {
+      "full_name": "BWT Alpine F1 Team",
+      "championships": 2,
+      "wins": 1,
+      "base": "Enstone, United Kingdom",
+      "bio": "Carrying the torch of the historic Enstone squad, Alpine represents the might of the French automotive industry. Combining deep engineering heritage with national ambition, they embody the fighting spirit of Les Bleus."
+    },
+    "williams": {
+      "full_name": "Williams Racing",
+      "championships": 9,
+      "wins": 114,
+      "base": "Grove, United Kingdom",
+      "bio": "Williams Racing is a monument to pure garagista racing heritage. After decades of struggle, the storied Grove outfit is currently engaged in a massive modernization effort, aiming to reclaim its rightful place at the front of the grid."
+    },
+    "audi": {
+      "full_name": "Stake F1 Team Kick Sauber (Audi F1 Project)",
+      "championships": 0,
+      "wins": 1,
+      "base": "Hinwil, Switzerland",
+      "bio": "Transitioning from the historic Sauber legacy, the Hinwil outfit is laying the meticulous groundwork for the official Audi works entry. Their current era is defined by deep structural revitalization and strategic patience."
+    },
+    "haas": {
+      "full_name": "MoneyGram Haas F1 Team",
+      "championships": 0,
+      "wins": 0,
+      "base": "Kannapolis, United States",
+      "bio": "Haas is F1's rugged American underdog. Operating efficiently with a tightly optimized vendor model and close Ferrari ties, they pride themselves on extracting maximum performance per dollar."
+    },
+    "rb": {
+      "full_name": "Visa Cash App RB F1 Team",
+      "championships": 0,
+      "wins": 2,
+      "base": "Faenza, Italy",
+      "bio": "Operating out of Faenza, the sister team to Red Bull Racing continues to forge its own aggressive identity. Known previously as AlphaTauri and Toro Rosso, they act as the ultimate proving ground for future World Champions."
+    }
+  }
+}
