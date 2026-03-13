@@ -6,3 +6,4 @@ schedule
 flask
 flask-cors
 requests
+feedparser

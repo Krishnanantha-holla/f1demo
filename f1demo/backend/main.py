@@ -59,6 +59,14 @@ async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
     return data
 
 
+async def safe_cached_get(url: str, default, ttl: int = CACHE_TTL):
+    """Return cached remote data or a safe fallback when upstream is unavailable."""
+    try:
+        return await cached_get(url, ttl=ttl)
+    except Exception:
+        return default
+
+
 def current_year() -> int:
     return datetime.now().year
 
@@ -82,7 +90,7 @@ async def health():
             r = await c.get(f"{OPENF1}/sessions?session_key=latest")
         return {"status": "ok" if r.status_code == 200 else "degraded"}
     except Exception:
-        return {"status": "error"}
+        return {"status": "degraded"}
 
 
 # ══════════════════════════════════════════
@@ -246,28 +254,28 @@ async def live_proxy(endpoint: str, session_key: str = "latest"):
 # ── Preserved OpenF1 proxy endpoints (same as original Flask app) ──
 @app.get("/api/drivers")
 async def drivers(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/drivers?session_key={session_key}")
+    return await safe_cached_get(f"{OPENF1}/drivers?session_key={session_key}", [], ttl=120)
 
 
 @app.get("/api/meetings")
 async def meetings(year: int = None):
     yr = year or current_year()
-    return await cached_get(f"{OPENF1}/meetings?year={yr}", ttl=300)
+    return await safe_cached_get(f"{OPENF1}/meetings?year={yr}", [], ttl=300)
 
 
 @app.get("/api/sessions")
 async def sessions(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/sessions?session_key={session_key}")
+    return await safe_cached_get(f"{OPENF1}/sessions?session_key={session_key}", [], ttl=120)
 
 
 @app.get("/api/sessions/meeting/{meeting_key}")
 async def sessions_for_meeting(meeting_key: int):
-    return await cached_get(f"{OPENF1}/sessions?meeting_key={meeting_key}")
+    return await safe_cached_get(f"{OPENF1}/sessions?meeting_key={meeting_key}", [], ttl=300)
 
 
 @app.get("/api/positions")
 async def positions(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/position?session_key={session_key}", ttl=10)
+    return await safe_cached_get(f"{OPENF1}/position?session_key={session_key}", [], ttl=10)
 
 
 @app.get("/api/laps")
@@ -275,22 +283,22 @@ async def laps_openf1(session_key: str = "latest", driver_number: int = None):
     url = f"{OPENF1}/laps?session_key={session_key}"
     if driver_number:
         url += f"&driver_number={driver_number}"
-    return await cached_get(url, ttl=15)
+    return await safe_cached_get(url, [], ttl=15)
 
 
 @app.get("/api/pits")
 async def pits(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/pit?session_key={session_key}", ttl=15)
+    return await safe_cached_get(f"{OPENF1}/pit?session_key={session_key}", [], ttl=15)
 
 
 @app.get("/api/stints")
 async def stints(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/stints?session_key={session_key}", ttl=15)
+    return await safe_cached_get(f"{OPENF1}/stints?session_key={session_key}", [], ttl=15)
 
 
 @app.get("/api/weather")
 async def weather(session_key: str = "latest"):
-    data = await cached_get(f"{OPENF1}/weather?session_key={session_key}", ttl=30)
+    data = await safe_cached_get(f"{OPENF1}/weather?session_key={session_key}", [], ttl=30)
     if data and isinstance(data, list):
         return data[-1]
     return {}
@@ -298,7 +306,7 @@ async def weather(session_key: str = "latest"):
 
 @app.get("/api/race_control")
 async def race_control(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/race_control?session_key={session_key}", ttl=10)
+    return await safe_cached_get(f"{OPENF1}/race_control?session_key={session_key}", [], ttl=10)
 
 
 @app.get("/api/car_data")
@@ -306,12 +314,12 @@ async def car_data(session_key: str = "latest", driver_number: int = None):
     url = f"{OPENF1}/car_data?session_key={session_key}"
     if driver_number:
         url += f"&driver_number={driver_number}"
-    return await cached_get(url, ttl=5)
+    return await safe_cached_get(url, [], ttl=5)
 
 
 @app.get("/api/intervals")
 async def intervals(session_key: str = "latest"):
-    return await cached_get(f"{OPENF1}/intervals?session_key={session_key}", ttl=10)
+    return await safe_cached_get(f"{OPENF1}/intervals?session_key={session_key}", [], ttl=10)
 
 
 @app.get("/api/session_result")
@@ -319,21 +327,21 @@ async def session_result(session_key: str = "latest", position: int = None):
     url = f"{OPENF1}/session_result?session_key={session_key}"
     if position:
         url += f"&position<={position}"
-    return await cached_get(url, ttl=60)
+    return await safe_cached_get(url, [], ttl=60)
 
 
 @app.get("/api/starting_grid")
 async def starting_grid(session_key: str = None):
     if not session_key:
         return []
-    return await cached_get(f"{OPENF1}/starting_grid?session_key={session_key}", ttl=120)
+    return await safe_cached_get(f"{OPENF1}/starting_grid?session_key={session_key}", [], ttl=120)
 
 
 @app.get("/api/overtakes")
 async def overtakes(session_key: str = None):
     if not session_key:
         return []
-    return await cached_get(f"{OPENF1}/overtakes?session_key={session_key}", ttl=60)
+    return await safe_cached_get(f"{OPENF1}/overtakes?session_key={session_key}", [], ttl=60)
 
 
 @app.get("/api/team_radio")
@@ -341,7 +349,7 @@ async def team_radio(session_key: str = "latest", driver_number: int = None):
     url = f"{OPENF1}/team_radio?session_key={session_key}"
     if driver_number:
         url += f"&driver_number={driver_number}"
-    return await cached_get(url, ttl=30)
+    return await safe_cached_get(url, [], ttl=30)
 
 
 @app.get("/api/circuit_map/{circuit_key}")
@@ -437,7 +445,10 @@ async def ti_weather(year: int, event: str, session: str):
 # ══════════════════════════════════════════
 @app.get("/api/news")
 async def get_news():
-    import feedparser
+    try:
+        import feedparser
+    except ImportError:
+        return []
     # Aggregate multiple F1 RSS feeds
     sources = [
         {"url": "https://www.crash.net/rss/f1", "source": "Crash.net"},
