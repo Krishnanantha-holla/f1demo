@@ -1,46 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api, getTeamColor } from '../api';
 import { Loading, ErrorMsg, EmptyMsg, formatDate, formatDateFull, pad } from '../components/Shared';
 
-// ── Live Banner ──
-function LiveBanner() {
-  const [mode, setMode] = useState('idle');
-  const [sessionInfo, setSessionInfo] = useState(null);
-
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const modeData = await api.sessionMode();
-        setMode(modeData.mode || 'idle');
-        if (modeData.mode === 'live') {
-          if (modeData.session) {
-            setSessionInfo(modeData.session);
-          } else {
-            const sess = await api.sessions();
-            if (Array.isArray(sess) && sess.length) setSessionInfo(sess[0]);
-          }
-        }
-      } catch {}
-    };
-    check();
-    const id = setInterval(check, 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (mode !== 'live') return null;
-
-  return (
-    <div className="live-banner">
-      <span className="live-dot" />
-      <span className="live-text">
-        LIVE: {sessionInfo ? `${sessionInfo.session_name} — ${sessionInfo.circuit_short_name}` : 'Session in progress'}
-      </span>
-    </div>
-  );
-}
-
 function getCountdown(targetDate) {
+  if (!targetDate) return null;
   const diff = new Date(targetDate) - new Date();
   if (diff <= 0) return null;
   return {
@@ -51,17 +15,102 @@ function getCountdown(targetDate) {
   };
 }
 
-// ── Next Race Card ──
-function NextRace({ meeting }) {
-  const [cd, setCd] = useState(meeting ? getCountdown(meeting.date_start) : null);
+function eventName(event) {
+  return event?.EventName || event?.meeting_name || 'Unknown Event';
+}
+
+function eventLocation(event) {
+  const location = event?.Location || event?.location;
+  const country = event?.Country || event?.country_name;
+  return [location, country].filter(Boolean).join(', ');
+}
+
+function eventFirstSessionDate(event) {
+  return event?.Session1DateUtc || event?.date_start || null;
+}
+
+function eventLastSessionDate(event) {
+  return event?.Session5DateUtc || event?.date_end || event?.EventDate || null;
+}
+
+function eventSessionList(event) {
+  if (!event) return [];
+  const sessions = [];
+  for (let index = 1; index <= 5; index += 1) {
+    const name = event[`Session${index}`];
+    const date = event[`Session${index}DateUtc`] || event[`Session${index}Date`];
+    if (name && date) sessions.push({ name, date });
+  }
+  return sessions;
+}
+
+function mergeDriverMaps(openF1Drivers, freeRoster) {
+  const merged = {};
+
+  freeRoster.forEach((driver) => {
+    merged[driver.driver_number] = { ...driver };
+  });
+
+  openF1Drivers.forEach((driver) => {
+    const current = merged[driver.driver_number] || {};
+    merged[driver.driver_number] = {
+      ...current,
+      ...driver,
+      full_name: driver.full_name || current.full_name,
+      first_name: driver.first_name || current.first_name,
+      last_name: driver.last_name || current.last_name,
+      team_name: driver.team_name || current.team_name,
+      name_acronym: driver.name_acronym || current.name_acronym,
+    };
+  });
+
+  return merged;
+}
+
+function driverDisplay(driver, fallback) {
+  if (driver?.first_name || driver?.last_name) {
+    return `${driver.first_name || ''} ${driver.last_name || ''}`.trim();
+  }
+  if (driver?.full_name) return driver.full_name;
+  return fallback || 'Unknown Driver';
+}
+
+function formatLapTime(seconds) {
+  if (!seconds) return '—';
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(3).padStart(6, '0')}`;
+}
+
+function LiveBanner({ modeMeta, freeContext }) {
+  const currentEvent = freeContext?.current_event || null;
+  const currentSession = modeMeta?.session || freeContext?.current_session || null;
+  const shouldShow = modeMeta?.mode === 'live' || !!currentEvent;
+
+  if (!shouldShow) return null;
+
+  return (
+    <div className="live-banner live-banner-enhanced">
+      <span className="live-dot" />
+      <span className="live-text">
+        {currentSession?.session_name || 'Session in progress'}
+        {currentEvent ? ` • ${eventName(currentEvent)}` : ''}
+      </span>
+      {modeMeta?.reason === 'openf1_live_restricted' && <span className="live-banner-pill">Free Mode</span>}
+    </div>
+  );
+}
+
+function NextRace({ event, currentSession, isWeekendLive }) {
+  const targetDate = isWeekendLive ? (currentSession?.date_end || eventLastSessionDate(event)) : eventFirstSessionDate(event);
+  const [cd, setCd] = useState(getCountdown(targetDate));
 
   useEffect(() => {
-    if (!meeting) return;
-    const id = setInterval(() => setCd(getCountdown(meeting.date_start)), 1000);
+    setCd(getCountdown(targetDate));
+    if (!targetDate) return undefined;
+    const id = setInterval(() => setCd(getCountdown(targetDate)), 1000);
     return () => clearInterval(id);
-  }, [meeting]);
+  }, [targetDate]);
 
-  if (!meeting) {
+  if (!event) {
     return (
       <div className="card next-race-card">
         <div className="next-race-content">
@@ -73,21 +122,19 @@ function NextRace({ meeting }) {
   }
 
   return (
-    <Link to={`/race/${meeting.meeting_key}`} className="card next-race-card clickable" style={{ textDecoration: 'none', color: 'inherit' }}>
+    <div className="card next-race-card">
       <div className="next-race-content">
-        <div className="next-race-label">Next Race</div>
-        <div className="next-race-name">{meeting.meeting_name}</div>
-        <div className="next-race-circuit">
-          {meeting.circuit_short_name} — {meeting.location}, {meeting.country_name}
-        </div>
+        <div className="next-race-label">{isWeekendLive ? 'Weekend Live' : 'Next Event'}</div>
+        <div className="next-race-name">{eventName(event)}</div>
+        <div className="next-race-circuit">{eventLocation(event)}</div>
         <div className="next-race-meta">
           <div>
-            <div className="meta-item-label">Date</div>
-            <div className="meta-item-value">{formatDateFull(meeting.date_start)}</div>
+            <div className="meta-item-label">Headline</div>
+            <div className="meta-item-value">{isWeekendLive ? (currentSession?.session_name || 'Session in progress') : 'Weekend start'}</div>
           </div>
           <div>
-            <div className="meta-item-label">Circuit</div>
-            <div className="meta-item-value">{meeting.circuit_short_name}</div>
+            <div className="meta-item-label">Date</div>
+            <div className="meta-item-value">{formatDateFull(targetDate || eventLastSessionDate(event))}</div>
           </div>
         </div>
         {cd ? (
@@ -98,129 +145,160 @@ function NextRace({ meeting }) {
             <div className="cd-item"><div className="cd-num">{pad(cd.secs)}</div><div className="cd-label">Secs</div></div>
           </div>
         ) : (
-          <div style={{ marginTop: '0.5rem', color: 'var(--green)', fontWeight: 700 }}>Race weekend is live!</div>
+          <div className="dashboard-pill-row">
+            <span className="dashboard-pill dashboard-pill-live">{isWeekendLive ? 'Live now' : 'On deck'}</span>
+            {currentSession?.session_name && <span className="dashboard-pill">{currentSession.session_name}</span>}
+          </div>
         )}
-        <div className="click-hint">View race details →</div>
       </div>
-    </Link>
+    </div>
   );
 }
 
-// ── Live Session Card ──
-function LiveSession({ drivers }) {
+function WeekendRadar({ freeContext, modeMeta }) {
+  const currentEvent = freeContext?.current_event || null;
+  const nextEvent = freeContext?.next_event || null;
+  const sessions = eventSessionList(currentEvent || nextEvent);
+  const activeSessionName = modeMeta?.session?.session_name || freeContext?.current_session?.session_name;
+
+  if (!sessions.length) return null;
+
+  return (
+    <div className="card weekend-radar-card">
+      <div className="card-header">
+        <span className="card-title">Weekend Radar</span>
+        <span className="card-badge">{currentEvent ? 'Current weekend' : 'Next weekend'}</span>
+      </div>
+      <div className="card-body">
+        <div className="session-stack">
+          {sessions.map((session) => {
+            const active = session.name === activeSessionName;
+            return (
+              <div key={`${session.name}-${session.date}`} className={`session-row ${active ? 'active' : ''}`}>
+                <div>
+                  <div className="session-row-name">{session.name}</div>
+                  <div className="session-row-date">{formatDateFull(session.date)}</div>
+                </div>
+                <span className={`dashboard-pill ${active ? 'dashboard-pill-live' : ''}`}>{active ? 'Live' : 'Scheduled'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LiveSession({ drivers, modeMeta, freeContext }) {
   const [session, setSession] = useState(null);
   const [positions, setPositions] = useState([]);
   const [laps, setLaps] = useState({});
-  const [fallbackRace, setFallbackRace] = useState(null);
-  const [fallbackResults, setFallbackResults] = useState([]);
   const [status, setStatus] = useState('loading');
-  const [modeMeta, setModeMeta] = useState(null);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    async function loadLive() {
+      if (modeMeta?.mode !== 'live') {
+        if (!cancelled) setStatus('empty');
+        return;
+      }
+
+      if (modeMeta?.reason === 'openf1_live_restricted') {
+        if (!cancelled) setStatus('restricted');
+        return;
+      }
+
       try {
-        const modeData = await api.sessionMode().catch(() => ({ mode: 'idle' }));
-        setModeMeta(modeData || null);
-        if (modeData.mode !== 'live') {
-          setStatus('empty');
-          return;
-        }
-
-        if (modeData.reason === 'openf1_live_restricted') {
-          try {
-            const last = await api.lastResults();
-            setFallbackRace(last || null);
-            setFallbackResults(Array.isArray(last?.Results) ? last.Results.slice(0, 10) : []);
-          } catch {
-            setFallbackRace(null);
-            setFallbackResults([]);
-          }
-          setStatus('restricted');
-          return;
-        }
-
-        const sessData = await api.sessions(modeData.session?.session_key || undefined);
+        const sessionKey = modeMeta?.session?.session_key;
+        const sessData = await api.sessions(sessionKey || undefined);
         const sess = Array.isArray(sessData) ? sessData[0] : null;
         if (!sess) {
-          setStatus('empty');
+          if (!cancelled) setStatus('empty');
           return;
         }
-        setSession(sess);
 
-        const posData = await api.positions(sess.session_key);
-        // Get latest position per driver
+        const [posData, lapData] = await Promise.all([
+          api.positions(sess.session_key),
+          api.laps(sess.session_key).catch(() => []),
+        ]);
+
+        if (cancelled) return;
+
         const latest = {};
-        posData.forEach(p => {
-          if (!latest[p.driver_number] || new Date(p.date) > new Date(latest[p.driver_number].date))
-            latest[p.driver_number] = p;
+        (posData || []).forEach((entry) => {
+          if (!latest[entry.driver_number] || new Date(entry.date) > new Date(latest[entry.driver_number].date)) {
+            latest[entry.driver_number] = entry;
+          }
         });
+
+        const lapMap = {};
+        (lapData || []).forEach((entry) => {
+          if (!lapMap[entry.driver_number] || entry.lap_number > lapMap[entry.driver_number].lap_number) {
+            lapMap[entry.driver_number] = entry;
+          }
+        });
+
+        setSession(sess);
         setPositions(Object.values(latest).sort((a, b) => a.position - b.position));
-
-        try {
-          const lapData = await api.laps(sess.session_key);
-          const lapMap = {};
-          lapData.forEach(l => {
-            if (!lapMap[l.driver_number] || l.lap_number > lapMap[l.driver_number].lap_number)
-              lapMap[l.driver_number] = l;
-          });
-          setLaps(lapMap);
-        } catch {}
-
+        setLaps(lapMap);
         setStatus('ok');
       } catch {
-        setStatus('error');
+        if (!cancelled) setStatus('error');
       }
-    })();
-  }, []);
+    }
 
-  const now = new Date();
-  const isLive = !!(session && now >= new Date(session.date_start) && now <= new Date(session.date_end));
+    loadLive();
+    const id = setInterval(loadLive, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [modeMeta]);
+
+  const currentEvent = freeContext?.current_event || null;
+  const currentSession = modeMeta?.session || freeContext?.current_session || null;
+  const schedule = eventSessionList(currentEvent);
 
   return (
-    <div className="card">
+    <div className="card live-session-card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span className="card-title">Live Session</span>
         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          {session
-            ? `${session.session_name} — ${session.circuit_short_name}`
-            : (status === 'restricted' && fallbackRace?.raceName)
-              ? `Free fallback — ${fallbackRace.raceName}`
+          {status === 'ok'
+            ? `${session?.session_name || currentSession?.session_name} — ${session?.circuit_short_name || currentEvent?.Location || ''}`
+            : currentEvent
+              ? `${currentSession?.session_name || 'Current weekend'} — ${eventName(currentEvent)}`
               : 'No active session'}
         </span>
       </div>
       <div className="card-body">
         {status === 'loading' && <Loading text="Loading session..." />}
-        {status === 'error' && <EmptyMsg text="No active live session" />}
+        {status === 'error' && <EmptyMsg text="Live session temporarily unavailable." />}
         {status === 'empty' && <EmptyMsg text="No active live session" />}
         {status === 'restricted' && (
-          <>
-            <div style={{ marginBottom: '0.6rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Free mode: live telemetry is unavailable right now, showing latest completed race results.
+          <div className="free-mode-panel">
+            <div className="free-mode-copy">
+              <div className="free-mode-title">Free mode keeps the current weekend visible.</div>
+              <div className="free-mode-text">
+                Live telemetry is paywalled right now, but this card will keep refreshing the active event and session schedule automatically.
+              </div>
             </div>
-            {fallbackResults.length ? (
-              <table className="data-table">
-                <thead>
-                  <tr><th>Pos</th><th>Driver</th><th>Team</th><th>Time/Status</th></tr>
-                </thead>
-                <tbody>
-                  {fallbackResults.map(r => (
-                    <tr key={`${r.position}-${r.Driver?.driverId || r.number}`}>
-                      <td className="col-pos">{r.position || '—'}</td>
-                      <td>
-                        {r.Driver
-                          ? `${r.Driver.givenName || ''} ${r.Driver.familyName || ''}`.trim()
-                          : `#${r.number || '—'}`}
-                      </td>
-                      <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{r.Constructor?.name || '—'}</td>
-                      <td style={{ fontSize: '0.8rem' }}>{r.Time?.time || r.status || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <EmptyMsg text={modeMeta?.detail || 'Live session detected, but live timing is restricted for free access during session.'} />
-            )}
-          </>
+            <div className="session-stack compact">
+              {schedule.map((sessionRow) => {
+                const active = sessionRow.name === currentSession?.session_name;
+                return (
+                  <div key={`${sessionRow.name}-${sessionRow.date}`} className={`session-row ${active ? 'active' : ''}`}>
+                    <div>
+                      <div className="session-row-name">{sessionRow.name}</div>
+                      <div className="session-row-date">{formatDateFull(sessionRow.date)}</div>
+                    </div>
+                    <span className={`dashboard-pill ${active ? 'dashboard-pill-live' : ''}`}>{active ? 'Now' : 'Queued'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
         {status === 'ok' && (
           <table className="data-table">
@@ -230,26 +308,22 @@ function LiveSession({ drivers }) {
             <tbody>
               {positions.length === 0 ? (
                 <tr><td colSpan={5} className="empty-msg">Waiting for live timing...</td></tr>
-              ) : positions.slice(0, 20).map(p => {
-                const d = drivers[p.driver_number];
-                const lap = laps[p.driver_number];
-                const lapTime = lap?.lap_duration
-                  ? `${Math.floor(lap.lap_duration / 60)}:${(lap.lap_duration % 60).toFixed(3).padStart(6, '0')}`
-                  : '—';
+              ) : positions.slice(0, 20).map((position) => {
+                const driver = drivers[position.driver_number];
+                const lap = laps[position.driver_number];
+                const teamColor = driver?.team_colour ? `#${driver.team_colour}` : getTeamColor(driver?.team_name);
                 return (
-                  <tr key={p.driver_number}>
-                    <td className="col-pos">{p.position}</td>
+                  <tr key={position.driver_number}>
+                    <td className="col-pos">{position.position}</td>
                     <td>
                       <div className="driver-cell">
-                        <span className="team-dot" style={{ background: d ? `#${d.team_colour}` : '#555' }} />
-                        <span className="driver-info-name">{d ? `${d.first_name} ${d.last_name}` : `#${p.driver_number}`}</span>
+                        <span className="team-dot" style={{ background: teamColor }} />
+                        <span className="driver-info-name">{driverDisplay(driver, `#${position.driver_number}`)}</span>
                       </div>
                     </td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{d?.team_name || ''}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{lapTime}</td>
-                    <td style={{ fontSize: '0.8rem', color: isLive ? 'var(--green)' : 'var(--text-muted)' }}>
-                      {isLive ? 'Racing' : 'Finished'}
-                    </td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{driver?.team_name || '—'}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{formatLapTime(lap?.lap_duration)}</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--green)' }}>Running</td>
                   </tr>
                 );
               })}
@@ -261,7 +335,6 @@ function LiveSession({ drivers }) {
   );
 }
 
-// ── Standings Table ──
 function DriverStandings({ drivers }) {
   const [data, setData] = useState([]);
   const [status, setStatus] = useState('loading');
@@ -269,7 +342,7 @@ function DriverStandings({ drivers }) {
 
   useEffect(() => {
     api.driverStandings()
-      .then(d => { setData(d); setStatus(d.length ? 'ok' : 'empty'); })
+      .then((result) => { setData(result); setStatus(result.length ? 'ok' : 'empty'); })
       .catch(() => setStatus('error'));
   }, []);
 
@@ -284,24 +357,25 @@ function DriverStandings({ drivers }) {
           <table className="data-table">
             <thead><tr><th className="col-pos">P</th><th>Driver</th><th>Team</th><th className="col-pts">Pts</th></tr></thead>
             <tbody>
-              {data.map(s => {
-                const dNum = Number(s.driver_number ?? s.Driver?.permanentNumber) || null;
-                const d = dNum ? drivers[dNum] : null;
-                const pos = s.position_current ?? s.position ?? '—';
-                const pts = s.points_current ?? s.points ?? 0;
-                const teamName = s.team_name || s.Constructors?.[0]?.name || d?.team_name || '';
+              {data.map((standing) => {
+                const driverNumber = Number(standing.driver_number ?? standing.Driver?.permanentNumber) || null;
+                const driver = driverNumber ? drivers[driverNumber] : null;
+                const position = standing.position_current ?? standing.position ?? '—';
+                const points = standing.points_current ?? standing.points ?? 0;
+                const teamName = standing.team_name || standing.Constructors?.[0]?.name || driver?.team_name || '';
+                const teamColor = driver?.team_colour ? `#${driver.team_colour}` : getTeamColor(teamName);
                 return (
-                  <tr key={dNum || s.position}>
-                    <td className="col-pos">{pos}</td>
+                  <tr key={driverNumber || standing.position}>
+                    <td className="col-pos">{position}</td>
                     <td>
                       <div className="driver-cell">
-                        <span className="team-dot" style={{ background: d ? `#${d.team_colour}` : '#555' }} />
-                        {d?.headshot_url && <img className="driver-headshot" src={d.headshot_url} alt="" loading="lazy" />}
-                        <span className="driver-info-name">{d ? `${d.first_name} ${d.last_name}` : s.full_name || s.Driver?.familyName || `#${dNum}`}</span>
+                        <span className="team-dot" style={{ background: teamColor }} />
+                        {driver?.headshot_url && <img className="driver-headshot" src={driver.headshot_url} alt="" loading="lazy" />}
+                        <span className="driver-info-name">{driverDisplay(driver, `${standing.Driver?.givenName || ''} ${standing.Driver?.familyName || ''}`.trim())}</span>
                       </div>
                     </td>
                     <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{teamName}</td>
-                    <td className="col-pts">{pts}</td>
+                    <td className="col-pts">{points}</td>
                   </tr>
                 );
               })}
@@ -320,16 +394,9 @@ function ConstructorStandings({ drivers }) {
 
   useEffect(() => {
     api.constructorStandings()
-      .then(d => { setData(d); setStatus(d.length ? 'ok' : 'empty'); })
+      .then((result) => { setData(result); setStatus(result.length ? 'ok' : 'empty'); })
       .catch(() => setStatus('error'));
   }, []);
-
-  function getTeamColor(teamName) {
-    for (const d of Object.values(drivers)) {
-      if (d.team_name === teamName) return `#${d.team_colour}`;
-    }
-    return '#555';
-  }
 
   return (
     <div className="card clickable" onClick={() => navigate('/constructors')}>
@@ -342,20 +409,20 @@ function ConstructorStandings({ drivers }) {
           <table className="data-table">
             <thead><tr><th className="col-pos">P</th><th>Constructor</th><th className="col-pts">Pts</th></tr></thead>
             <tbody>
-              {data.map(s => {
-                const teamName = s.Constructor?.name || s.team_name || 'Unknown';
-                const pos = s.position_current ?? s.position ?? '—';
-                const pts = s.points_current ?? s.points ?? 0;
+              {data.map((standing) => {
+                const teamName = standing.Constructor?.name || standing.team_name || 'Unknown';
+                const position = standing.position_current ?? standing.position ?? '—';
+                const points = standing.points_current ?? standing.points ?? 0;
                 return (
                   <tr key={teamName}>
-                    <td className="col-pos">{pos}</td>
+                    <td className="col-pos">{position}</td>
                     <td>
                       <div className="driver-cell">
                         <span className="team-dot" style={{ background: getTeamColor(teamName) }} />
                         <span className="driver-info-name">{teamName}</span>
                       </div>
                     </td>
-                    <td className="col-pts">{pts}</td>
+                    <td className="col-pts">{points}</td>
                   </tr>
                 );
               })}
@@ -367,110 +434,68 @@ function ConstructorStandings({ drivers }) {
   );
 }
 
-// ── Last Race Result ──
-function LastRaceResult({ meetings, drivers }) {
-  const [result, setResult] = useState([]);
-  const [lastMeeting, setLastMeeting] = useState(null);
+function LastRaceResult() {
+  const [race, setRace] = useState(null);
   const [status, setStatus] = useState('loading');
 
   useEffect(() => {
-    (async () => {
-      try {
-        const now = new Date();
-        const pastMeetings = meetings
-          .filter(m => new Date(m.date_end || m.date_start) < now)
-          .sort((a, b) => new Date(b.date_start) - new Date(a.date_start));
-        if (!pastMeetings.length) { setStatus('empty'); return; }
-        const mtg = pastMeetings[0];
-        setLastMeeting(mtg);
-        const sess = await api.sessionsForMeeting(mtg.meeting_key);
-        const raceSession = sess.find(s => s.session_name === 'Race')
-          || sess.find(s => s.session_name === 'Sprint')
-          || sess[sess.length - 1];
-        if (!raceSession) { setStatus('empty'); return; }
-        const res = await api.sessionResult(raceSession.session_key);
-        const top3 = Array.isArray(res)
-          ? res.sort((a, b) => (a.position || 99) - (b.position || 99)).slice(0, 3)
-          : [];
-        setResult(top3);
-        setStatus(top3.length ? 'ok' : 'empty');
-      } catch {
-        setStatus('error');
-      }
-    })();
-  }, [meetings]);
+    api.lastResults()
+      .then((result) => {
+        setRace(result || null);
+        setStatus(result?.Results?.length ? 'ok' : 'empty');
+      })
+      .catch(() => setStatus('error'));
+  }, []);
 
   if (status === 'loading') return <Loading />;
-  if (status === 'error' || status === 'empty') return null;
+  if (status !== 'ok') return null;
 
-  const podiumColors = ['#ffd700', '#c0c0c0', '#cd7f32'];
-  const podiumLabels = ['1st', '2nd', '3rd'];
+  const topThree = race.Results.slice(0, 3);
+  const podiumColors = ['#ffd166', '#d1d5db', '#d97706'];
 
   return (
-    <div className="card" style={{ animation: 'cardEntrance 0.6s var(--ease-out-expo) 0.1s both' }}>
+    <div className="card podium-card">
       <div className="card-header">
-        <span className="card-title">Last Race Result</span>
-        <span className="card-badge">{lastMeeting?.meeting_name}</span>
+        <span className="card-title">Last Classified Finish</span>
+        <span className="card-badge">{race.raceName}</span>
       </div>
       <div className="card-body">
-        <div className="dash-podium">
-          {result.map((r, i) => {
-            const d = drivers[r.driver_number];
-            return (
-              <div key={r.driver_number} className="dash-podium-slot">
-                <div className="dash-podium-medal" style={{ color: podiumColors[i] }}>{podiumLabels[i]}</div>
-                {d?.headshot_url && (
-                  <img src={d.headshot_url} alt="" className="dash-podium-img" loading="lazy" />
-                )}
-                <div className="dash-podium-name">{d?.name_acronym || `#${r.driver_number}`}</div>
-                <div className="dash-podium-team" style={{ color: d ? `#${d.team_colour}` : 'var(--text-muted)' }}>
-                  {d?.team_name || ''}
-                </div>
-              </div>
-            );
-          })}
+        <div className="dash-podium refined">
+          {topThree.map((result, index) => (
+            <div key={result.Driver?.driverId || index} className="dash-podium-slot">
+              <div className="dash-podium-medal" style={{ color: podiumColors[index] }}>P{result.position}</div>
+              <div className="dash-podium-name">{result.Driver?.code || result.Driver?.familyName}</div>
+              <div className="dash-podium-team">{result.Constructor?.name}</div>
+              <div className="dash-podium-time">{result.Time?.time || result.status}</div>
+            </div>
+          ))}
         </div>
-        {lastMeeting && (
-          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-            <Link
-              to={`/race/${lastMeeting.meeting_key}`}
-              className="cal-results-link"
-            >
-              View Full Results →
-            </Link>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-// ── Calendar Mini (bottom of Dashboard) ──
-function CalendarMini({ meetings }) {
-  const now = new Date();
-  const nextMeeting = meetings.find(m => new Date(m.date_end) > now);
+function CalendarMini({ schedule, currentEvent }) {
+  if (!schedule.length) return null;
 
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">Race Calendar</span>
-        <span className="card-badge">{meetings.length} Races</span>
+        <span className="card-title">Season Map</span>
+        <span className="card-badge">{schedule.length} Rounds</span>
       </div>
       <div className="card-body">
-        <div className="calendar-grid">
-          {meetings.map((m, i) => {
-            const completed = new Date(m.date_end) < now;
-            const isNext = nextMeeting && m.meeting_key === nextMeeting.meeting_key;
-            let cls = 'race-event';
-            if (completed) cls += ' completed';
-            if (isNext) cls += ' next-up';
+        <div className="calendar-grid enhanced-calendar-grid">
+          {schedule.map((event) => {
+            const active = currentEvent?.RoundNumber === event.RoundNumber;
+            const complete = new Date(eventLastSessionDate(event)) < new Date();
             return (
-              <Link key={m.meeting_key} to={`/race/${m.meeting_key}`} className={`${cls} clickable`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="race-round">Round {i + 1}</div>
-                <div className="race-event-name">{m.meeting_name}</div>
-                <div className="race-event-loc">{m.location}, {m.country_name}</div>
-                <div className="race-event-date">{formatDate(m.date_start)} — {formatDate(m.date_end)}</div>
-              </Link>
+              <div key={`${event.RoundNumber}-${event.EventName}`} className={`race-event ${active ? 'next-up' : ''} ${complete ? 'completed' : ''}`}>
+                <div className="race-round">Round {event.RoundNumber}</div>
+                <div className="race-event-name">{event.EventName}</div>
+                <div className="race-event-loc">{event.Location}, {event.Country}</div>
+                <div className="race-event-date">{formatDate(eventFirstSessionDate(event))} — {formatDate(eventLastSessionDate(event))}</div>
+              </div>
             );
           })}
         </div>
@@ -479,50 +504,77 @@ function CalendarMini({ meetings }) {
   );
 }
 
-// ── Dashboard Page ──
 export default function Dashboard() {
   const [drivers, setDrivers] = useState({});
-  const [meetings, setMeetings] = useState([]);
+  const [freeContext, setFreeContext] = useState({ schedule: [] });
+  const [modeMeta, setModeMeta] = useState({ mode: 'idle' });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    async function loadInitial() {
       try {
-        const [driverData, meetingData] = await Promise.all([
-          api.drivers(),
-          api.meetings(),
+        const [openF1Drivers, freeRoster, context, mode] = await Promise.all([
+          api.drivers().catch(() => []),
+          api.freeRoster().catch(() => []),
+          api.freeContext().catch(() => ({ schedule: [] })),
+          api.sessionMode().catch(() => ({ mode: 'idle' })),
         ]);
-        const drMap = {};
-        driverData.forEach(d => { drMap[d.driver_number] = d; });
-        setDrivers(drMap);
-        setMeetings(meetingData);
-      } catch (e) {
-        console.error('Dashboard load error:', e);
+
+        if (cancelled) return;
+
+        setDrivers(mergeDriverMaps(openF1Drivers || [], freeRoster || []));
+        setFreeContext(context || { schedule: [] });
+        setModeMeta(mode || { mode: 'idle' });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    })();
+    }
+
+    async function refreshDynamic() {
+      try {
+        const [context, mode] = await Promise.all([
+          api.freeContext().catch(() => ({ schedule: [] })),
+          api.sessionMode().catch(() => ({ mode: 'idle' })),
+        ]);
+        if (cancelled) return;
+        setFreeContext(context || { schedule: [] });
+        setModeMeta(mode || { mode: 'idle' });
+      } catch {}
+    }
+
+    loadInitial();
+    const id = setInterval(refreshDynamic, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
   if (loading) return <Loading text="Loading dashboard..." />;
 
-  const now = new Date();
-  const nextMeeting = meetings.find(m => new Date(m.date_end) > now) || null;
+  const currentEvent = freeContext?.current_event || null;
+  const nextEvent = freeContext?.next_event || null;
+  const featuredEvent = currentEvent || nextEvent;
 
   return (
     <>
-      <LiveBanner />
-      <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
+      <LiveBanner modeMeta={modeMeta} freeContext={freeContext} />
+      <div className="page-header dashboard-header">
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <div className="page-subtitle">Reliable race-weekend tracking with free-mode fallbacks.</div>
+        </div>
         <span className="season-badge">Season {new Date().getFullYear()}</span>
       </div>
 
       <div className="top-row" style={{ animationDelay: '0ms' }}>
         <div className="top-row-left">
-          <NextRace meeting={nextMeeting} />
-          <LastRaceResult meetings={meetings} drivers={drivers} />
+          <NextRace event={featuredEvent} currentSession={freeContext?.current_session} isWeekendLive={!!currentEvent} />
+          <WeekendRadar freeContext={freeContext} modeMeta={modeMeta} />
         </div>
-        <LiveSession drivers={drivers} />
+        <LiveSession drivers={drivers} modeMeta={modeMeta} freeContext={freeContext} />
       </div>
 
       <div className="standings-row" style={{ animation: 'cardEntrance 0.6s var(--ease-out-expo) 0.15s both' }}>
@@ -530,11 +582,14 @@ export default function Dashboard() {
         <ConstructorStandings drivers={drivers} />
       </div>
 
-      {meetings.length > 0 && (
-        <div style={{ animation: 'cardEntrance 0.6s var(--ease-out-expo) 0.3s both' }}>
-          <CalendarMini meetings={meetings} />
+      <div className="bottom-dashboard-grid">
+        <div style={{ animation: 'cardEntrance 0.6s var(--ease-out-expo) 0.25s both' }}>
+          <LastRaceResult />
         </div>
-      )}
+        <div style={{ animation: 'cardEntrance 0.6s var(--ease-out-expo) 0.3s both' }}>
+          <CalendarMini schedule={freeContext?.schedule || []} currentEvent={currentEvent} />
+        </div>
+      </div>
     </>
   );
 }

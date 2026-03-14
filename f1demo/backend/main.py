@@ -6,7 +6,7 @@ import time
 import json
 import asyncio
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
@@ -75,6 +75,114 @@ async def safe_cached_get(url: str, default, ttl: int = CACHE_TTL):
 
 def current_year() -> int:
     return datetime.now().year
+
+
+def _ensure_utc(dt_value):
+    if dt_value is None:
+        return None
+    if hasattr(dt_value, "to_pydatetime"):
+        dt_value = dt_value.to_pydatetime()
+    if getattr(dt_value, "tzinfo", None) is None:
+        return dt_value.replace(tzinfo=timezone.utc)
+    return dt_value.astimezone(timezone.utc)
+
+
+def _serialize_value(value):
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value
+
+
+def _serialize_event_row(row) -> dict:
+    data = row.to_dict() if hasattr(row, "to_dict") else dict(row)
+    return {key: _serialize_value(value) for key, value in data.items()}
+
+
+def _event_session_windows(row) -> list[dict]:
+    windows = []
+    for index in range(1, 6):
+        session_name = row.get(f"Session{index}")
+        session_start = row.get(f"Session{index}DateUtc")
+        if not session_name or session_start is None:
+            continue
+        start = _ensure_utc(session_start)
+        if start is None:
+            continue
+
+        next_start = None
+        for next_index in range(index + 1, 6):
+            candidate = row.get(f"Session{next_index}DateUtc")
+            if candidate is not None:
+                next_start = _ensure_utc(candidate)
+                break
+
+        duration_hours = 4 if session_name in {"Race", "Sprint"} else 2
+        end = next_start if next_start and next_start > start else start + timedelta(hours=duration_hours)
+        windows.append({
+            "name": session_name,
+            "start": start,
+            "end": end,
+        })
+    return windows
+
+
+def _build_free_context(year: int | None = None) -> dict:
+    yr = year or current_year()
+    now = datetime.now(timezone.utc)
+
+    context = {
+        "year": yr,
+        "now": now.isoformat(),
+        "current_event": None,
+        "current_session": None,
+        "next_event": None,
+        "last_event": None,
+    }
+
+    if not HAS_FASTF1:
+        return context
+
+    try:
+        schedule = fastf1.get_event_schedule(yr, include_testing=False)
+    except Exception:
+        return context
+
+    serialized_rows = []
+    for _, row in schedule.iterrows():
+        serialized_rows.append(_serialize_event_row(row))
+        event_date = _ensure_utc(row.get("EventDate"))
+        first_session = None
+        for index in range(1, 6):
+            candidate = _ensure_utc(row.get(f"Session{index}DateUtc"))
+            if candidate is not None:
+                first_session = candidate
+                break
+        event_end = event_date + timedelta(days=1) if event_date else None
+
+        if event_end and event_end < now:
+            context["last_event"] = _serialize_event_row(row)
+
+        if first_session and first_session > now and context["next_event"] is None:
+            context["next_event"] = _serialize_event_row(row)
+
+        if first_session and event_end and first_session <= now <= event_end and context["current_event"] is None:
+            context["current_event"] = _serialize_event_row(row)
+
+        for window in _event_session_windows(row):
+            if window["start"] <= now <= window["end"]:
+                context["current_event"] = _serialize_event_row(row)
+                context["current_session"] = {
+                    "session_name": window["name"],
+                    "date_start": window["start"].isoformat(),
+                    "date_end": window["end"].isoformat(),
+                }
+                break
+
+        if context["current_event"]:
+            break
+
+    context["schedule"] = serialized_rows
+    return context
 
 
 # ══════════════════════════════════════════
@@ -271,6 +379,71 @@ async def race_results(year: int, round_num: int):
         return data
     except Exception:
         return {}
+
+
+@app.get("/api/free/context")
+def free_context(year: int = None):
+    return _build_free_context(year)
+
+
+@app.get("/api/free/roster")
+async def free_roster(year: int = None):
+    yr = year or current_year()
+    roster: dict[int, dict] = {}
+
+    try:
+        standings = await cached_get(f"{JOLPICA}/{yr}/driverStandings.json", ttl=300)
+        driver_standings = standings["MRData"]["StandingsTable"]["StandingsLists"][0]["DriverStandings"]
+    except Exception:
+        driver_standings = []
+
+    for entry in driver_standings:
+        driver = entry.get("Driver", {})
+        driver_number = driver.get("permanentNumber")
+        if not driver_number:
+            continue
+        number = int(driver_number)
+        constructors = entry.get("Constructors") or []
+        team_name = constructors[0].get("name") if constructors else None
+        roster[number] = {
+            "driver_number": number,
+            "first_name": driver.get("givenName") or "",
+            "last_name": driver.get("familyName") or "",
+            "full_name": f"{driver.get('givenName', '')} {driver.get('familyName', '')}".strip(),
+            "name_acronym": driver.get("code") or "",
+            "team_name": team_name,
+            "position": int(entry.get("position") or 0),
+            "points": float(entry.get("points") or 0),
+            "wins": int(entry.get("wins") or 0),
+        }
+
+    try:
+        latest = await cached_get(f"{JOLPICA}/{yr}/last/results.json", ttl=300)
+        race = latest["MRData"]["RaceTable"]["Races"][0]
+        for result in race.get("Results", []):
+            driver = result.get("Driver", {})
+            number = driver.get("permanentNumber") or result.get("number")
+            if not number:
+                continue
+            number = int(number)
+            entry = roster.setdefault(number, {
+                "driver_number": number,
+                "first_name": driver.get("givenName") or "",
+                "last_name": driver.get("familyName") or "",
+                "full_name": f"{driver.get('givenName', '')} {driver.get('familyName', '')}".strip(),
+                "name_acronym": driver.get("code") or "",
+                "team_name": None,
+                "position": 0,
+                "points": 0,
+                "wins": 0,
+            })
+            constructor = result.get("Constructor") or {}
+            if constructor.get("name"):
+                entry["team_name"] = constructor.get("name")
+    except Exception:
+        pass
+
+    return list(sorted(roster.values(), key=lambda item: (item.get("position") or 999, item.get("driver_number") or 999)))
 
 
 # ══════════════════════════════════════════

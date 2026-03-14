@@ -208,11 +208,18 @@ main {
 .page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
   animation: fadeSlideUp 0.5s var(--ease-out-expo) both;
 }
 .page-title { font-size: 1.5rem; font-weight: 900; }
+.page-subtitle {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+}
 .season-badge {
   background: var(--f1-red);
   color: white;
@@ -306,6 +313,12 @@ main {
   gap: 1.25rem;
   margin-bottom: 1.25rem;
 }
+.bottom-dashboard-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 1.25rem;
+  align-items: start;
+}
 
 /* ── Next Race ── */
 .next-race-card {
@@ -343,6 +356,103 @@ main {
 }
 .cd-num { font-size: 1.3rem; font-weight: 900; color: var(--f1-red); line-height: 1; }
 .cd-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-top: 2px; }
+.dashboard-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.dashboard-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.03);
+}
+.dashboard-pill-live {
+  color: #fff;
+  border-color: rgba(255, 30, 0, 0.45);
+  background: linear-gradient(135deg, rgba(255, 30, 0, 0.85), rgba(140, 16, 0, 0.85));
+}
+.weekend-radar-card .card-body,
+.live-session-card .card-body,
+.podium-card .card-body {
+  padding: 1rem;
+}
+.session-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.session-stack.compact {
+  margin-top: 1rem;
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  transition: transform 0.2s var(--ease-out-expo), border-color 0.2s var(--ease-out-expo), background 0.2s var(--ease-out-expo);
+}
+.session-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.14);
+}
+.session-row.active {
+  border-color: rgba(255, 30, 0, 0.45);
+  background: linear-gradient(135deg, rgba(255, 30, 0, 0.08), rgba(255,255,255,0.02));
+}
+.session-row-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+.session-row-date {
+  margin-top: 0.15rem;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+.free-mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.free-mode-copy {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(255, 30, 0, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 30, 0, 0.08), rgba(255,255,255,0.02));
+}
+.free-mode-title {
+  font-weight: 800;
+  margin-bottom: 0.3rem;
+}
+.free-mode-text {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.enhanced-calendar-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.dash-podium.refined {
+  gap: 0.85rem;
+  padding: 0.15rem;
+}
+.dash-podium-time {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
 
 /* ── Dashboard Calendar Mini ── */
 .calendar-grid {
@@ -1233,7 +1343,7 @@ main {
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
-  .top-row, .standings-row { grid-template-columns: 1fr; }
+  .top-row, .standings-row, .bottom-dashboard-grid { grid-template-columns: 1fr; }
   .cal-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
@@ -1252,7 +1362,9 @@ main {
   .telem-selectors { flex-direction: column; }
   .telem-select-group { max-width: 100%; }
   .telem-chart-svg { min-width: 600px; }
-  .top-row, .standings-row { grid-template-columns: 1fr; }
+  .top-row, .standings-row, .bottom-dashboard-grid { grid-template-columns: 1fr; }
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .live-banner { align-items: flex-start; flex-direction: column; }
 }
 
 /* ══════════════════════════════════════════
@@ -2243,6 +2355,7 @@ main {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  justify-content: space-between;
   margin-bottom: 1.25rem;
   animation: cardEntrance 0.4s var(--ease-out-expo) both;
 }
@@ -2258,6 +2371,15 @@ main {
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--f1-red);
+}
+.live-banner-pill {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255,255,255,0.06);
 }
 
 /* ═══════════════════════════════════════

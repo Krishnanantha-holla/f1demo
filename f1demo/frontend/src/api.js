@@ -135,6 +135,10 @@ export const api = {
   // OpenF1 live proxy
   live:         (endpoint, sessionKey) => get(`/live/${endpoint}`, { query: { session_key: sessionKey || 'latest' } }),
 
+  // Free-mode helpers
+  freeContext:  (year) => get('/free/context', { query: { year } }),
+  freeRoster:   (year) => get('/free/roster', { query: { year } }),
+
   // TracingInsights data
   tiEvents:     (year) => get(`/ti/events/${year}`),
   tiSessions:   (year, event) => get(`/ti/sessions/${year}/${encodeURIComponent(event)}`),

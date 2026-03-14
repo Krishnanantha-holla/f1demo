@@ -302,9 +302,10 @@ export default function Constructors() {
   useEffect(() => {
     (async () => {
       try {
-        const [stData, drvData, dsData, bioData] = await Promise.all([
+        const [stData, drvData, freeRoster, dsData, bioData] = await Promise.all([
           api.constructorStandings().catch(() => []),
           api.drivers().catch(() => []),
+          api.freeRoster().catch(() => []),
           api.driverStandings().catch(() => []),
           api.bios().catch(() => ({ constructors: {} }))
         ]);
@@ -316,7 +317,7 @@ export default function Constructors() {
 
         const uniqueDrivers = [];
         const seen = new Set();
-        (drvData || []).forEach(d => {
+        ([...(drvData || []), ...(freeRoster || [])]).forEach(d => {
           if (!seen.has(d.driver_number)) {
             uniqueDrivers.push(d);
             seen.add(d.driver_number);
@@ -367,7 +368,7 @@ export default function Constructors() {
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div>
           <h1 className="page-title" style={{ fontSize: '2.5rem', letterSpacing: '-1px' }}>The Teams</h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: '0.2rem', fontSize: '0.9rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
+          <p className="page-subtitle" style={{ marginTop: '0.2rem', fontSize: '0.9rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
             Grid Encyclopedia {new Date().getFullYear()}
           </p>
         </div>

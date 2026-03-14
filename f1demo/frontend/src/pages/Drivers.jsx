@@ -1,8 +1,75 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, getTeamColor } from '../api';
-import { Loading, ErrorMsg } from '../components/Shared';
+import { Loading, ErrorMsg, EmptyMsg } from '../components/Shared';
 
 const ARVID_HEADSHOT = 'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/lindblad.png.transform/2col/image.png';
+
+const CAR_YEAR = new Date().getFullYear();
+const CAR_YEARS = [CAR_YEAR, CAR_YEAR - 1, CAR_YEAR - 2, CAR_YEAR - 3].filter((y, i, arr) => y >= 2022 && arr.indexOf(y) === i);
+
+const TEAM_CAR_SLUGS = {
+  'McLaren': ['mclaren'],
+  'Ferrari': ['ferrari'],
+  'Red Bull Racing': ['red-bull-racing', 'red-bull'],
+  'Mercedes': ['mercedes', 'mercedes-amg'],
+  'Aston Martin': ['aston-martin'],
+  'Alpine': ['alpine'],
+  'Williams': ['williams'],
+  'RB': ['rb', 'racing-bulls'],
+  'Racing Bulls': ['rb', 'racing-bulls'],
+  'Kick Sauber': ['kick-sauber', 'sauber'],
+  'Sauber': ['kick-sauber', 'sauber'],
+  'Haas F1 Team': ['haas', 'haas-f1-team'],
+  'Haas': ['haas', 'haas-f1-team'],
+  'Audi': ['audi', 'sauber'],
+  'Cadillac': ['cadillac'],
+};
+
+function carUrl(year, slug) {
+  return `https://media.formula1.com/d_team_car_fallback_image.png/content/dam/fom-website/teams/${year}/${slug}.png`;
+}
+
+function getTeamSlugs(teamName) {
+  if (!teamName) return [];
+  if (TEAM_CAR_SLUGS[teamName]) return TEAM_CAR_SLUGS[teamName];
+  const lower = teamName.toLowerCase();
+  for (const [key, slugs] of Object.entries(TEAM_CAR_SLUGS)) {
+    const k = key.toLowerCase();
+    if (lower.includes(k) || k.includes(lower)) return slugs;
+  }
+  return [];
+}
+
+function getCarImageCandidates(teamName) {
+  const slugs = getTeamSlugs(teamName);
+  if (!slugs.length) return [];
+  const urls = [];
+  for (const year of CAR_YEARS) {
+    for (const slug of slugs) urls.push(carUrl(year, slug));
+  }
+  return [...new Set(urls)];
+}
+
+function advanceCarFallback(e, candidates) {
+  if (!candidates || candidates.length === 0) {
+    e.currentTarget.style.display = 'none';
+    return;
+  }
+  const nextIdx = Number(e.currentTarget.dataset.fallbackIdx || '0') + 1;
+  if (nextIdx < candidates.length) {
+    e.currentTarget.dataset.fallbackIdx = String(nextIdx);
+    e.currentTarget.src = candidates[nextIdx];
+    return;
+  }
+  e.currentTarget.style.display = 'none';
+}
+
+function legacyBand(championships = 0, wins = 0) {
+  if (championships >= 4 || wins >= 60) return 'Dynasty Era';
+  if (championships >= 1 || wins >= 8) return 'Proven Winner';
+  if (wins >= 1) return 'Breakthrough Winner';
+  return 'Rising Legacy';
+}
 
 function getDriverHeadshot(driver) {
   if (!driver) return '';
@@ -216,17 +283,37 @@ export default function Drivers() {
   const [standings, setStandings] = useState({});
   const [bios, setBios] = useState({});
   const [status, setStatus] = useState('loading');
+  const [expandedDriver, setExpandedDriver] = useState(null);
   const [modalDriver, setModalDriver] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [driverData, standingsData, bioData] = await Promise.all([
-          api.drivers(),
+        const [driverData, freeRoster, standingsData, bioData] = await Promise.all([
+          api.drivers().catch(() => []),
+          api.freeRoster().catch(() => []),
           api.driverStandings().catch(() => []),
           api.bios().catch(() => ({ drivers: {} }))
         ]);
-        setDrivers(driverData);
+
+        const merged = new Map();
+        (freeRoster || []).forEach(d => merged.set(d.driver_number, { ...d }));
+        (driverData || []).forEach(d => {
+          merged.set(d.driver_number, {
+            ...(merged.get(d.driver_number) || {}),
+            ...d,
+            full_name: d.full_name || merged.get(d.driver_number)?.full_name,
+            team_name: d.team_name || merged.get(d.driver_number)?.team_name,
+          });
+        });
+
+        const mergedDrivers = Array.from(merged.values()).sort((a, b) => {
+          const posA = Number(a.position || 999);
+          const posB = Number(b.position || 999);
+          return posA - posB;
+        });
+
+        setDrivers(mergedDrivers);
         setBios(bioData.drivers || {});
         
         const sMap = {};
@@ -241,7 +328,7 @@ export default function Drivers() {
           }
         });
         setStandings(sMap);
-        setStatus('ok');
+        setStatus(mergedDrivers.length ? 'ok' : 'empty');
       } catch {
         setStatus('error');
       }
@@ -255,12 +342,16 @@ export default function Drivers() {
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Drivers</h1>
+        <div>
+          <h1 className="page-title">Drivers</h1>
+          <div className="page-subtitle">Season roster with free-mode data fallback when live endpoints are restricted.</div>
+        </div>
         <span className="season-badge">Season {new Date().getFullYear()}</span>
       </div>
 
       {status === 'loading' && <Loading text="Loading drivers..." />}
       {status === 'error' && <ErrorMsg text="Failed to load drivers." />}
+      {status === 'empty' && <EmptyMsg text="Driver roster is temporarily unavailable." />}
       {status === 'ok' && (
         <div className="drivers-grid">
           {drivers.map((d, i) => {
@@ -268,11 +359,18 @@ export default function Drivers() {
             const teamColor = `#${d.team_colour || '555'}`;
             const pointsPct = s ? ((s.points || 0) / maxPoints) * 100 : 0;
             const headshotUrl = getDriverHeadshot(d);
+            const isExpanded = expandedDriver === d.driver_number;
+            const teamCarCandidates = getCarImageCandidates(d.team_name);
+            const teamCar = teamCarCandidates[0] || null;
+            const bio = bios?.[String(d.driver_number)] || {};
+            const legacy = legacyBand(bio.championships || 0, bio.wins || 0);
+            const teammate = drivers.find(td => td.team_name === d.team_name && td.driver_number !== d.driver_number) || null;
+            const teammatePoints = teammate ? (standings[teammate.driver_number]?.points || 0) : null;
             return (
               <div
                 key={d.driver_number}
-                className="driver-card"
-                onClick={() => setModalDriver(d.driver_number)}
+                className={`driver-card ${isExpanded ? 'expanded' : ''}`}
+                onClick={() => setExpandedDriver(isExpanded ? null : d.driver_number)}
                 style={{
                   animationDelay: `${Math.min(i * 50, 600)}ms`,
                   '--card-glow-color': `${teamColor}22`,
@@ -280,6 +378,16 @@ export default function Drivers() {
                 }}
               >
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: teamColor, borderRadius: '10px 0 0 10px' }} />
+                {teamCar && (
+                  <img
+                    src={teamCar}
+                    alt=""
+                    className="constructor-car-img"
+                    loading="lazy"
+                    data-fallback-idx="0"
+                    onError={(e) => advanceCarFallback(e, teamCarCandidates)}
+                  />
+                )}
 
                 <div className="driver-card-top">
                   {headshotUrl ? (
@@ -318,7 +426,39 @@ export default function Drivers() {
                 </div>
 
                 <div className="expand-hint">
-                  <span className="click-hint">Click for profile →</span>
+                  <span className="click-hint">{isExpanded ? 'Tap to collapse' : 'Tap to expand dossier'}</span>
+                </div>
+
+                <div className="detail-expand">
+                  <div className="detail-stats">
+                    <div className="stat-box"><div className="stat-val">{bio.championships || 0}</div><div className="stat-label">Titles</div></div>
+                    <div className="stat-box"><div className="stat-val">{bio.wins || 0}</div><div className="stat-label">Career Wins</div></div>
+                    <div className="stat-box"><div className="stat-val">{s?.wins ?? 0}</div><div className="stat-label">Season Wins</div></div>
+                  </div>
+
+                  <div className="detail-laps">
+                    <div className="detail-laps-title">Legacy Snapshot</div>
+                    <div className="detail-lap-row"><span>Legacy Tier</span><strong>{legacy}</strong></div>
+                    <div className="detail-lap-row"><span>Career Podiums</span><strong>{bio.podiums ?? '—'}</strong></div>
+                    <div className="detail-lap-row"><span>Career Points</span><strong>{bio.career_points ?? '—'}</strong></div>
+                    <div className="detail-lap-row"><span>Teammate</span><strong>{teammate ? teammate.name_acronym || teammate.last_name : 'TBD'}</strong></div>
+                    <div className="detail-lap-row"><span>Garage Delta</span><strong>{teammatePoints != null && s ? `${(s.points - teammatePoints) >= 0 ? '+' : ''}${(s.points - teammatePoints).toFixed(0)} pts` : '—'}</strong></div>
+                  </div>
+
+                  <div className="driver-inline-bio">{(bio.bio || `${d.full_name} is competing for ${d.team_name}.`).split('. ')[0]}.</div>
+
+                  <div className="driver-inline-actions">
+                    <button
+                      type="button"
+                      className="cal-more-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setModalDriver(d.driver_number);
+                      }}
+                    >
+                      Open Full Legacy Profile
+                    </button>
+                  </div>
                 </div>
               </div>
             );
