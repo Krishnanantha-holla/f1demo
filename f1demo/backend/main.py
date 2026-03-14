@@ -5,6 +5,7 @@ Season-agnostic: never hardcodes a year, team, or driver.
 import time
 import json
 import asyncio
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -52,7 +53,12 @@ async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
     if url in CACHE and now - CACHE[url]["ts"] < ttl:
         return CACHE[url]["data"]
     async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(url)
+        headers = await _openf1_headers()
+        resp = await client.get(url, headers=headers)
+        # If token expired, refresh once and retry.
+        if resp.status_code == 401 and OPENF1_AUTH_ENABLED:
+            retry_headers = await _openf1_headers(force_refresh=True)
+            resp = await client.get(url, headers=retry_headers)
         resp.raise_for_status()
         data = resp.json()
     CACHE[url] = {"data": data, "ts": now}
@@ -79,6 +85,80 @@ JOLPICA = "https://api.jolpi.ca/ergast/f1"
 TI_RAW = "https://raw.githubusercontent.com/TracingInsights"
 TI_API = "https://api.github.com/repos/TracingInsights"
 
+OPENF1_TOKEN_URL = "https://api.openf1.org/token"
+OPENF1_USERNAME = os.getenv("OPENF1_USERNAME")
+OPENF1_PASSWORD = os.getenv("OPENF1_PASSWORD")
+OPENF1_ACCESS_TOKEN = os.getenv("OPENF1_ACCESS_TOKEN")
+OPENF1_AUTH_ENABLED = bool(OPENF1_ACCESS_TOKEN or (OPENF1_USERNAME and OPENF1_PASSWORD))
+
+OPENF1_TOKEN_STATE = {
+    "token": OPENF1_ACCESS_TOKEN,
+    # When passed as static env var, keep it until upstream rejects it.
+    "expires_at": 10**12 if OPENF1_ACCESS_TOKEN else 0,
+}
+OPENF1_TOKEN_LOCK = asyncio.Lock()
+
+
+async def _fetch_openf1_token() -> tuple[str | None, int]:
+    """Fetch a short-lived OpenF1 OAuth token using configured credentials."""
+    if not (OPENF1_USERNAME and OPENF1_PASSWORD):
+        return None, 0
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            OPENF1_TOKEN_URL,
+            data={"username": OPENF1_USERNAME, "password": OPENF1_PASSWORD},
+            headers={"Content-Type": "application/x-www-form-urlencoded", "accept": "application/json"},
+        )
+
+    if resp.status_code != 200:
+        return None, 0
+
+    body = resp.json() if resp.content else {}
+    token = body.get("access_token")
+    try:
+        expires_in = int(body.get("expires_in", 0))
+    except Exception:
+        expires_in = 0
+    return token, expires_in
+
+
+async def _get_openf1_token(force_refresh: bool = False) -> str | None:
+    """Return an access token if available via env or OAuth credentials."""
+    now = time.time()
+    current = OPENF1_TOKEN_STATE.get("token")
+    if not force_refresh and current and now < OPENF1_TOKEN_STATE.get("expires_at", 0):
+        return current
+
+    # If only a static token is configured (no username/password), keep using it.
+    if OPENF1_ACCESS_TOKEN and not (OPENF1_USERNAME and OPENF1_PASSWORD):
+        return OPENF1_ACCESS_TOKEN
+
+    async with OPENF1_TOKEN_LOCK:
+        now = time.time()
+        current = OPENF1_TOKEN_STATE.get("token")
+        if not force_refresh and current and now < OPENF1_TOKEN_STATE.get("expires_at", 0):
+            return current
+
+        token, expires_in = await _fetch_openf1_token()
+        if not token:
+            return current
+
+        # Refresh a bit early to avoid token expiry mid-request.
+        safe_ttl = max(expires_in - 30, 30)
+        OPENF1_TOKEN_STATE["token"] = token
+        OPENF1_TOKEN_STATE["expires_at"] = now + safe_ttl
+        return token
+
+
+async def _openf1_headers(force_refresh: bool = False) -> dict:
+    headers = {"accept": "application/json"}
+    if OPENF1_AUTH_ENABLED:
+        token = await _get_openf1_token(force_refresh=force_refresh)
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    return headers
+
 
 # ══════════════════════════════════════════
 # HEALTH
@@ -87,7 +167,12 @@ TI_API = "https://api.github.com/repos/TracingInsights"
 async def health():
     try:
         async with httpx.AsyncClient(timeout=5.0) as c:
-            r = await c.get(f"{OPENF1}/sessions?session_key=latest")
+            r = await c.get(f"{OPENF1}/sessions?session_key=latest", headers=await _openf1_headers())
+            if r.status_code == 401 and OPENF1_AUTH_ENABLED:
+                r = await c.get(
+                    f"{OPENF1}/sessions?session_key=latest",
+                    headers=await _openf1_headers(force_refresh=True),
+                )
         return {"status": "ok" if r.status_code == 200 else "degraded"}
     except Exception:
         return {"status": "degraded"}
@@ -371,7 +456,46 @@ async def circuit_map(circuit_key: int, year: int = None):
 # SESSION MODE (for frontend polling)
 # ══════════════════════════════════════════
 @app.get("/api/session-mode")
-def session_mode():
+async def session_mode():
+    # Prefer OpenF1 for real-time mode detection; fall back to state file if unavailable.
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                f"{OPENF1}/sessions?session_key=latest",
+                headers=await _openf1_headers(),
+            )
+            if resp.status_code == 401 and OPENF1_AUTH_ENABLED:
+                resp = await client.get(
+                    f"{OPENF1}/sessions?session_key=latest",
+                    headers=await _openf1_headers(force_refresh=True),
+                )
+
+        if resp.status_code == 200:
+            payload = resp.json() if resp.content else []
+            session = payload[0] if isinstance(payload, list) and payload else None
+            if session and session.get("date_start") and session.get("date_end"):
+                now = datetime.now(timezone.utc)
+                start = datetime.fromisoformat(session["date_start"].replace("Z", "+00:00"))
+                end = datetime.fromisoformat(session["date_end"].replace("Z", "+00:00"))
+                if start <= now <= end:
+                    return {"mode": "live", "session": session, "source": "openf1"}
+
+        if resp.status_code == 401:
+            try:
+                detail = (resp.json() or {}).get("detail", "")
+            except Exception:
+                detail = resp.text or ""
+            if "Live F1 session in progress" in detail:
+                return {
+                    "mode": "live",
+                    "session": None,
+                    "source": "openf1",
+                    "reason": "openf1_live_restricted",
+                    "detail": detail,
+                }
+    except Exception:
+        pass
+
     state_file = Path("./state.json")
     if state_file.exists():
         return json.loads(state_file.read_text())

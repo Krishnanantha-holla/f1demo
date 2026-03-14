@@ -294,10 +294,30 @@ export default function Calendar() {
     return m.date_start;
   }
 
+  function isChampionshipRace(m) {
+    const name = (m.meeting_name || '').toLowerCase();
+    if (name.includes('testing') || name.includes('test')) return false;
+
+    const sess = sessions[m.meeting_key] || [];
+    if (!sess.length) return true;
+
+    return sess.some(s => {
+      const sn = (s.session_name || '').toLowerCase();
+      return sn === 'race' || sn === 'sprint';
+    });
+  }
+
   // Season stats
-  const totalRaces = meetings.length;
-  const completedRaces = meetings.filter(m => isPast(getEndDate(m))).length;
+  const championshipMeetings = meetings.filter(isChampionshipRace);
+  const raceRoundByKey = {};
+  championshipMeetings.forEach((m, idx) => {
+    raceRoundByKey[m.meeting_key] = idx + 1;
+  });
+
+  const totalRaces = championshipMeetings.length;
+  const completedRaces = championshipMeetings.filter(m => isPast(getEndDate(m))).length;
   const remainingRaces = totalRaces - completedRaces;
+  const progressPct = totalRaces > 0 ? (completedRaces / totalRaces) * 100 : 0;
 
   return (
     <>
@@ -317,7 +337,7 @@ export default function Calendar() {
               <span>{remainingRaces} remaining</span>
             </div>
             <div className="cal-progress-bar">
-              <div className="cal-progress-fill" style={{ width: `${(completedRaces / totalRaces) * 100}%` }} />
+              <div className="cal-progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
           </div>
 
@@ -347,7 +367,9 @@ export default function Calendar() {
                   </div>
 
                   <div className="cal-card-content">
-                    <div className="cal-round">Round {i + 1}</div>
+                    <div className="cal-round">
+                      {raceRoundByKey[m.meeting_key] ? `Round ${raceRoundByKey[m.meeting_key]}` : 'Testing'}
+                    </div>
                     <div className="cal-name">{m.meeting_name}</div>
                     <div className="cal-location">{m.location}, {m.country_name}</div>
                     <div className="cal-dates">{formatDate(m.date_start)} — {formatDate(getEndDate(m))}</div>

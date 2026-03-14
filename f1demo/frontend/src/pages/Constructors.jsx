@@ -2,33 +2,72 @@ import { useEffect, useState, useCallback } from 'react';
 import { api, getTeamColor } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';
 
-// Car image URLs (year-dynamic)
+// Car image URLs with year + slug fallback
 const CAR_YEAR = new Date().getFullYear();
-function carUrl(slug) { return `https://media.formula1.com/d_team_car_fallback_image.png/content/dam/fom-website/teams/${CAR_YEAR}/${slug}.png`; }
-const CAR_IMAGES = {
-  'McLaren':        carUrl('mclaren'),
-  'Ferrari':        carUrl('ferrari'),
-  'Red Bull Racing':carUrl('red-bull-racing'),
-  'Mercedes':       carUrl('mercedes'),
-  'Aston Martin':   carUrl('aston-martin'),
-  'Alpine':         carUrl('alpine'),
-  'Williams':       carUrl('williams'),
-  'RB':             carUrl('rb'),
-  'Racing Bulls':   carUrl('rb'),
-  'Kick Sauber':    carUrl('kick-sauber'),
-  'Haas F1 Team':   carUrl('haas'),
-  'Audi':           carUrl('audi'),
-  'Cadillac':       carUrl('cadillac'),
+const CAR_YEARS = [CAR_YEAR, CAR_YEAR - 1, CAR_YEAR - 2, CAR_YEAR - 3].filter((y, i, arr) => y >= 2022 && arr.indexOf(y) === i);
+
+function carUrl(year, slug) {
+  return `https://media.formula1.com/d_team_car_fallback_image.png/content/dam/fom-website/teams/${year}/${slug}.png`;
+}
+
+const TEAM_CAR_SLUGS = {
+  'McLaren': ['mclaren'],
+  'Ferrari': ['ferrari'],
+  'Red Bull Racing': ['red-bull-racing', 'red-bull'],
+  'Mercedes': ['mercedes', 'mercedes-amg'],
+  'Aston Martin': ['aston-martin'],
+  'Alpine': ['alpine'],
+  'Williams': ['williams'],
+  'RB': ['rb', 'racing-bulls'],
+  'Racing Bulls': ['rb', 'racing-bulls'],
+  'Kick Sauber': ['kick-sauber', 'sauber'],
+  'Sauber': ['kick-sauber', 'sauber'],
+  'Haas F1 Team': ['haas', 'haas-f1-team'],
+  'Haas': ['haas', 'haas-f1-team'],
+  'Audi': ['audi', 'sauber'],
+  'Cadillac': ['cadillac'],
 };
 
-function getCarImage(teamName) {
-  if (!teamName) return null;
-  if (CAR_IMAGES[teamName]) return CAR_IMAGES[teamName];
+function getTeamSlugs(teamName) {
+  if (!teamName) return [];
+  if (TEAM_CAR_SLUGS[teamName]) return TEAM_CAR_SLUGS[teamName];
   const lower = teamName.toLowerCase();
-  for (const [key, url] of Object.entries(CAR_IMAGES)) {
-    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) return url;
+  for (const [key, slugs] of Object.entries(TEAM_CAR_SLUGS)) {
+    const k = key.toLowerCase();
+    if (lower.includes(k) || k.includes(lower)) return slugs;
   }
-  return null;
+  return [];
+}
+
+function getCarImageCandidates(teamName) {
+  const slugs = getTeamSlugs(teamName);
+  if (!slugs.length) return [];
+  const urls = [];
+  for (const year of CAR_YEARS) {
+    for (const slug of slugs) {
+      urls.push(carUrl(year, slug));
+    }
+  }
+  return [...new Set(urls)];
+}
+
+function getCarImage(teamName) {
+  const candidates = getCarImageCandidates(teamName);
+  return candidates[0] || null;
+}
+
+function advanceCarFallback(e, candidates) {
+  if (!candidates || candidates.length === 0) {
+    e.currentTarget.style.display = 'none';
+    return;
+  }
+  const nextIdx = Number(e.currentTarget.dataset.fallbackIdx || '0') + 1;
+  if (nextIdx < candidates.length) {
+    e.currentTarget.dataset.fallbackIdx = String(nextIdx);
+    e.currentTarget.src = candidates[nextIdx];
+    return;
+  }
+  e.currentTarget.style.display = 'none';
 }
 
 function fmtLap(secs) {
@@ -101,7 +140,8 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
     })();
   }, [teamDrivers]);
 
-  const carImg = getCarImage(team.team_name);
+  const carCandidates = getCarImageCandidates(team.team_name);
+  const carImg = carCandidates[0] || null;
 
   // Head-to-head comparison for 2 drivers
   const d1 = teamDrivers[0], d2 = teamDrivers[1];
@@ -126,7 +166,15 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
 
         <div className="panel-header">
           {carImg ? (
-            <img src={carImg} alt="" className="panel-headshot" style={{ borderBottom: `4px solid ${color}`, objectFit: 'contain', background: 'transparent' }} />
+            <img
+              src={carImg}
+              alt=""
+              className="panel-headshot"
+              style={{ borderBottom: `4px solid ${color}`, objectFit: 'contain', background: 'transparent' }}
+              loading="lazy"
+              data-fallback-idx="0"
+              onError={(e) => advanceCarFallback(e, carCandidates)}
+            />
           ) : (
             <div className="panel-headshot-placeholder" />
           )}
@@ -141,7 +189,14 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
         <div className="panel-scroll-content">
           {carImg && (
             <div className="team-hero-showcase" style={{ '--team-color': color }}>
-              <img src={carImg} alt={`${team.team_name} car`} className="team-hero-car" loading="lazy" />
+              <img
+                src={carImg}
+                alt={`${team.team_name} car`}
+                className="team-hero-car"
+                loading="lazy"
+                data-fallback-idx="0"
+                onError={(e) => advanceCarFallback(e, carCandidates)}
+              />
               <div className="team-hero-meta">
                 <span>Factory Line-Up</span>
                 <strong>{teamDrivers.length ? teamDrivers.map(d => d.name_acronym || d.last_name).join(' / ') : 'TBD'}</strong>
@@ -323,7 +378,8 @@ export default function Constructors() {
           const color = getTeamColor(team.team_name);
           const points = team.points_current || 0;
           const barWidth = `${Math.max((points / maxPts) * 100, 2)}%`;
-          const carImg = getCarImage(team.team_name);
+          const carCandidates = getCarImageCandidates(team.team_name);
+          const carImg = carCandidates[0] || null;
 
           // Get the two main drivers for the team
           const teamDrivers = allDrivers
@@ -370,7 +426,15 @@ export default function Constructors() {
                   </div>
                 </div>
                 {carImg && (
-                  <img src={carImg} alt="" className="pilot-card-img" style={{ objectFit: 'contain', width: '100px', height: '60px', opacity: 0.9, zIndex: 2, marginRight: '-10px' }} loading="lazy" onError={e => e.target.style.display = 'none'} />
+                  <img
+                    src={carImg}
+                    alt=""
+                    className="pilot-card-img"
+                    style={{ objectFit: 'contain', width: '100px', height: '60px', opacity: 0.9, zIndex: 2, marginRight: '-10px' }}
+                    loading="lazy"
+                    data-fallback-idx="0"
+                    onError={(e) => advanceCarFallback(e, carCandidates)}
+                  />
                 )}
               </div>
 

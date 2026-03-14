@@ -111,14 +111,31 @@ function LiveSession({ drivers }) {
   const [session, setSession] = useState(null);
   const [positions, setPositions] = useState([]);
   const [laps, setLaps] = useState({});
+  const [fallbackRace, setFallbackRace] = useState(null);
+  const [fallbackResults, setFallbackResults] = useState([]);
   const [status, setStatus] = useState('loading');
+  const [modeMeta, setModeMeta] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
         const modeData = await api.sessionMode().catch(() => ({ mode: 'idle' }));
+        setModeMeta(modeData || null);
         if (modeData.mode !== 'live') {
           setStatus('empty');
+          return;
+        }
+
+        if (modeData.reason === 'openf1_live_restricted') {
+          try {
+            const last = await api.lastResults();
+            setFallbackRace(last || null);
+            setFallbackResults(Array.isArray(last?.Results) ? last.Results.slice(0, 10) : []);
+          } catch {
+            setFallbackRace(null);
+            setFallbackResults([]);
+          }
+          setStatus('restricted');
           return;
         }
 
@@ -164,13 +181,47 @@ function LiveSession({ drivers }) {
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span className="card-title">Live Session</span>
         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          {session ? `${session.session_name} — ${session.circuit_short_name}` : 'No active session'}
+          {session
+            ? `${session.session_name} — ${session.circuit_short_name}`
+            : (status === 'restricted' && fallbackRace?.raceName)
+              ? `Free fallback — ${fallbackRace.raceName}`
+              : 'No active session'}
         </span>
       </div>
       <div className="card-body">
         {status === 'loading' && <Loading text="Loading session..." />}
         {status === 'error' && <EmptyMsg text="No active live session" />}
         {status === 'empty' && <EmptyMsg text="No active live session" />}
+        {status === 'restricted' && (
+          <>
+            <div style={{ marginBottom: '0.6rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Free mode: live telemetry is unavailable right now, showing latest completed race results.
+            </div>
+            {fallbackResults.length ? (
+              <table className="data-table">
+                <thead>
+                  <tr><th>Pos</th><th>Driver</th><th>Team</th><th>Time/Status</th></tr>
+                </thead>
+                <tbody>
+                  {fallbackResults.map(r => (
+                    <tr key={`${r.position}-${r.Driver?.driverId || r.number}`}>
+                      <td className="col-pos">{r.position || '—'}</td>
+                      <td>
+                        {r.Driver
+                          ? `${r.Driver.givenName || ''} ${r.Driver.familyName || ''}`.trim()
+                          : `#${r.number || '—'}`}
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{r.Constructor?.name || '—'}</td>
+                      <td style={{ fontSize: '0.8rem' }}>{r.Time?.time || r.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyMsg text={modeMeta?.detail || 'Live session detected, but live timing is restricted for free access during session.'} />
+            )}
+          </>
+        )}
         {status === 'ok' && (
           <table className="data-table">
             <thead>

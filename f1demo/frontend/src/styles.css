@@ -1163,7 +1163,7 @@ main {
 .real-track-map .track-outline {
   fill: none;
   stroke: rgba(255,255,255,0.08);
-  stroke-width: 1200;
+  stroke-width: 760;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

@@ -79,11 +79,11 @@ function RealTrackMap({ mapData }) {
       {/* Track outline (thick dark background) */}
       <path d={pathD} className="track-outline" />
       {/* Sector 1 - Blue */}
-      <path d={sectorPath(sector1)} fill="none" stroke={sectorColors[0]} strokeWidth="400" strokeLinecap="round" strokeLinejoin="round" className="track-sector" />
+      <path d={sectorPath(sector1)} fill="none" stroke={sectorColors[0]} strokeWidth="260" strokeLinecap="round" strokeLinejoin="round" className="track-sector" />
       {/* Sector 2 - Yellow */}
-      <path d={sectorPath(sector2)} fill="none" stroke={sectorColors[1]} strokeWidth="400" strokeLinecap="round" strokeLinejoin="round" className="track-sector" />
+      <path d={sectorPath(sector2)} fill="none" stroke={sectorColors[1]} strokeWidth="260" strokeLinecap="round" strokeLinejoin="round" className="track-sector" />
       {/* Sector 3 - Magenta */}
-      <path d={sectorPath(sector3)} fill="none" stroke={sectorColors[2]} strokeWidth="400" strokeLinecap="round" strokeLinejoin="round" className="track-sector" />
+      <path d={sectorPath(sector3)} fill="none" stroke={sectorColors[2]} strokeWidth="260" strokeLinecap="round" strokeLinejoin="round" className="track-sector" />
       {/* Start/Finish marker */}
       <circle cx={startPoint.x} cy={startPoint.y} r={600} fill="#00d26a" opacity="0.9" />
       <text x={startPoint.x} y={startPoint.y + 180} textAnchor="middle" fill="white" fontSize="400" fontWeight="700">S</text>
