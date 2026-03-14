@@ -44,8 +44,14 @@ function MiniTrackFallback({ circuit }) {
   if (!circuit?.svgPath) return null;
   return (
     <svg viewBox={circuit.svgViewBox} className="cal-mini-track-svg" preserveAspectRatio="xMidYMid meet">
-      <path d={circuit.svgPath} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={circuit.svgPath} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
       <path d={circuit.svgPath} fill="none" stroke="url(#calTrackFallback)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      {circuit.turnPositions?.map((turn) => (
+        <g key={turn.n}>
+          <circle cx={turn.x} cy={turn.y} r="5" fill="rgba(225,6,0,0.18)" stroke="#e10600" strokeWidth="0.8" />
+          <text x={turn.x} y={turn.y + 2.2} textAnchor="middle" fontSize="4" fill="#e8e8ee" fontWeight="700">{turn.n}</text>
+        </g>
+      ))}
       <defs>
         <linearGradient id="calTrackFallback" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#e10600" />

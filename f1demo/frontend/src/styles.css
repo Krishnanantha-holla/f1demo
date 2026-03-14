@@ -127,6 +127,30 @@ body::before {
   z-index: 200;
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
+  overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar { width: 0; height: 0; }
+
+.sidebar-scroll-fade {
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 18px;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.sidebar-scroll-fade.visible { opacity: 1; }
+.sidebar-scroll-fade.top {
+  top: 0;
+  margin-bottom: -18px;
+  background: linear-gradient(180deg, rgba(9, 9, 11, 0.95), rgba(9, 9, 11, 0));
+}
+.sidebar-scroll-fade.bottom {
+  bottom: 0;
+  margin-top: -18px;
+  background: linear-gradient(0deg, rgba(9, 9, 11, 0.95), rgba(9, 9, 11, 0));
 }
 
 /* F1 Logo at top of sidebar */
@@ -671,6 +695,7 @@ main {
 .driver-card.expanded {
   border-color: rgba(225,6,0,0.3);
   box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+  z-index: 2;
 }
 .driver-card.expanded::before { opacity: 1; }
 
@@ -719,6 +744,7 @@ main {
 }
 .points-bar-fill {
   height: 100%;
+  min-width: 2px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--f1-red), var(--orange));
   animation: barFill 1s var(--ease-out-expo) both;
@@ -734,7 +760,7 @@ main {
   margin-top: 0;
 }
 .driver-card.expanded .detail-expand {
-  max-height: 600px;
+  max-height: 1200px;
   opacity: 1;
   margin-top: 1rem;
 }
@@ -951,6 +977,24 @@ main {
   color: var(--text-dim);
 }
 
+.telemetry-scope-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.telemetry-scope-strip strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
 /* Section blocks */
 .telem-section {
   margin-bottom: 1.5rem;
@@ -975,6 +1019,32 @@ main {
   font-size: 0.72rem;
   color: var(--text-dim);
   font-weight: 400;
+}
+
+.axis-direction-hint {
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.info-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: help;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.info-badge:hover {
+  border-color: rgba(225, 6, 0, 0.45);
+  color: #fff;
+  background: rgba(225, 6, 0, 0.18);
 }
 
 /* Chart card */
@@ -2286,7 +2356,7 @@ main {
 /* Calendar Modal Map */
 .cal-modal-map {
   width: 100%;
-  height: 160px;
+  height: 210px;
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -2297,8 +2367,8 @@ main {
   overflow: hidden;
 }
 .cal-modal-map .cal-mini-track-svg {
-  max-height: 140px;
-  padding: 10px;
+  max-height: 190px;
+  padding: 8px;
 }
 
 .cal-modal-record {
@@ -2380,6 +2450,14 @@ main {
   font-weight: 800;
   color: #fff;
   background: rgba(255,255,255,0.06);
+}
+
+.live-session-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* ═══════════════════════════════════════
@@ -2727,7 +2805,7 @@ main {
    ═══════════════════════════════════════ */
 .pilot-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -2744,6 +2822,7 @@ main {
   gap: 0.6rem;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s var(--ease-spring);
   animation: cardIn 0.45s var(--ease-spring) both;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
 }
 .pilot-card:hover {
   border-color: rgba(225,6,0,0.4);
@@ -2867,6 +2946,14 @@ main {
 /* ═══════════════════════════════════════
    RESPONSIVE — PANEL & GRIDS
    ═══════════════════════════════════════ */
+@media (max-width: 1280px) {
+  .pilot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 980px) {
+  .pilot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 600px) {
   .encyclopedia-panel { width: 100vw; border-left: none; }
   .stats-showcase { grid-template-columns: repeat(3, 1fr); }

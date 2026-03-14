@@ -15,6 +15,34 @@ function formatTime(s) {
   return min > 0 ? `${min}:${sec.padStart(6, '0')}` : sec;
 }
 
+function pickPreferredSession(sessionList) {
+  if (!Array.isArray(sessionList) || sessionList.length === 0) return '';
+  const priority = [
+    'R',
+    'Race',
+    'Sprint',
+    'Sprint Race',
+    'Q',
+    'Qualifying',
+    'S',
+    'Sprint Qualifying',
+    'Sprint Shootout',
+    'FP3',
+    'Practice 3',
+    'FP2',
+    'Practice 2',
+    'FP1',
+    'Practice 1',
+  ];
+
+  for (const candidate of priority) {
+    const match = sessionList.find((sessionName) => sessionName === candidate);
+    if (match) return match;
+  }
+
+  return sessionList[0];
+}
+
 // ── SVG Lap Time Chart ──
 function LapTimeChart({ driversData, colors }) {
   if (!driversData.length) return null;
@@ -559,9 +587,11 @@ function SectorChart({ driversData, colors, driverCodes }) {
               if (typeof v === 'number' && v > 0 && v < 60) pts.push({ lap: d.lap[i], val: v });
             });
             if (pts.length < 2) return null;
-            const line = pts.map(p => `${x(p.lap)},${y(p.val)}`).join(' ');
+            const step = pts.length > 28 ? Math.ceil(pts.length / 28) : 1;
+            const sampled = step === 1 ? pts : pts.filter((_, idx) => idx % step === 0);
+            const line = sampled.map(p => `${x(p.lap)},${y(p.val)}`).join(' ');
             return (
-              <polyline key={`${di}-${sk}`} points={line} fill="none" stroke={sectorColors[sk]} strokeWidth="1.5" strokeLinejoin="round" opacity={0.4 + di * 0.2} strokeDasharray={di > 0 ? '4 2' : 'none'} />
+              <polyline key={`${di}-${sk}`} points={line} fill="none" stroke={sectorColors[sk]} strokeWidth="1.8" strokeLinejoin="round" opacity={0.45 + di * 0.18} strokeDasharray={di > 0 ? '4 2' : 'none'} />
             );
           })
         ))}
@@ -755,6 +785,16 @@ function LapSummaryCard({ driver, lapData, lapNum, color }) {
   );
 }
 
+function TelemetrySkeletonPanels() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="skeleton-chart" />
+      <div className="skeleton-chart" />
+      <div className="skeleton-chart" />
+    </div>
+  );
+}
+
 
 // ── Main Telemetry Page ──
 export default function Telemetry() {
@@ -770,6 +810,7 @@ export default function Telemetry() {
   const [selectedLaps, setSelectedLaps] = useState({});
   const [status, setStatus] = useState('idle');
   const [loadingStep, setLoadingStep] = useState('');
+  const [sessionChosenByUser, setSessionChosenByUser] = useState(false);
 
   const DEFAULT_COLORS = ['#e10600', '#00d7b6', '#4781d7', '#f5c623', '#f47600', '#e044a7', '#45b649'];
 
@@ -785,6 +826,7 @@ export default function Telemetry() {
     setTelemetryData([]);
     setSelectedLaps({});
     setStatus('loading');
+    setSessionChosenByUser(false);
     setLoadingStep('Loading events...');
     api.tiEvents(year)
       .then(evts => {
@@ -806,15 +848,22 @@ export default function Telemetry() {
     setTelemetryData([]);
     setSelectedLaps({});
     setStatus('loading');
+    setSessionChosenByUser(false);
     setLoadingStep('Loading sessions...');
     api.tiSessions(year, event)
       .then(sess => {
         setSessions(sess);
-        if (sess.length) setSession(sess[0]);
+        if (sess.length) setSession(pickPreferredSession(sess));
         setStatus('idle');
       })
       .catch(() => setStatus('idle'));
   }, [year, event]);
+
+  useEffect(() => {
+    if (!sessions.length || sessionChosenByUser) return;
+    const preferred = pickPreferredSession(sessions);
+    if (preferred && preferred !== session) setSession(preferred);
+  }, [sessions, session, sessionChosenByUser]);
 
   // Load drivers when session changes
   useEffect(() => {
@@ -830,8 +879,8 @@ export default function Telemetry() {
       .then(data => {
         const drivers = data.drivers || [];
         setDriverList(drivers);
-        // Auto-select first 4 drivers
-        setSelectedDrivers(drivers.slice(0, 4).map(d => d.driver));
+        // Auto-select first 3 drivers for cleaner default readability.
+        setSelectedDrivers(drivers.slice(0, 3).map(d => d.driver));
         setStatus('idle');
       })
       .catch(() => setStatus('idle'));
@@ -890,7 +939,7 @@ export default function Telemetry() {
   const toggleDriver = useCallback(code => {
     setSelectedDrivers(prev => {
       if (prev.includes(code)) return prev.filter(c => c !== code);
-      if (prev.length >= 5) return prev;
+      if (prev.length >= 3) return prev;
       return [...prev, code];
     });
   }, []);
@@ -904,6 +953,10 @@ export default function Telemetry() {
   const orderedLaptimeData = selectedDrivers.map(c => laptimeData[c]).filter(Boolean);
   const orderedColors = selectedDrivers.map(c => getColor(c));
   const sessionShort = SESSION_MAP[session] || session;
+  const maxLoadedLap = Object.values(laptimeData).reduce((acc, data) => {
+    const maxForDriver = Math.max(...((data?.lap || []).filter((lap) => Number.isFinite(lap))), 0);
+    return Math.max(acc, maxForDriver);
+  }, 0);
 
   return (
     <div className="telemetry-page">
@@ -931,10 +984,17 @@ export default function Telemetry() {
         </div>
         <div className="telem-select-group">
           <label>Session</label>
-          <select value={session} onChange={e => setSession(e.target.value)}>
+          <select value={session} onChange={e => { setSessionChosenByUser(true); setSession(e.target.value); }}>
             {sessions.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+      </div>
+
+      <div className="telemetry-scope-strip">
+        <span><strong>Event:</strong> {event || '—'}</span>
+        <span><strong>Session:</strong> {session || '—'}</span>
+        <span><strong>Drivers:</strong> {selectedDrivers.join(', ') || '—'}</span>
+        <span><strong>Max loaded lap:</strong> {maxLoadedLap || '—'}</span>
       </div>
 
       {/* Driver Chips */}
@@ -957,11 +1017,16 @@ export default function Telemetry() {
               );
             })}
           </div>
-          <span className="driver-chips-hint">{selectedDrivers.length}/5 selected</span>
+          <span className="driver-chips-hint">{selectedDrivers.length}/3 selected for clarity</span>
         </div>
       )}
 
-      {status === 'loading' && <Loading text={loadingStep || 'Loading...'} />}
+      {status === 'loading' && (
+        <>
+          <Loading text={loadingStep || 'Loading telemetry...'} />
+          <TelemetrySkeletonPanels />
+        </>
+      )}
       {status === 'error' && <ErrorMsg text="Failed to load data. Check the year and try again." />}
 
       {orderedLaptimeData.length > 0 && (
@@ -1070,7 +1135,7 @@ export default function Telemetry() {
 
               <div className="telem-section">
                 <div className="telem-section-title">
-                  <h2>Throttle Application</h2>
+                  <h2>Throttle Trace</h2>
                   <span className="telem-section-desc">Throttle input (0-100%) vs distance</span>
                 </div>
                 <div className="telem-chart-card">
@@ -1141,8 +1206,9 @@ export default function Telemetry() {
               <div className="telem-section">
                 <div className="telem-section-title">
                   <h2>Delta Time</h2>
-                  <span className="telem-section-desc">Time delta vs first selected driver — green = faster, red = slower</span>
+                  <span className="telem-section-desc">Time delta vs first selected driver</span>
                 </div>
+                <div className="axis-direction-hint">Axis note: values above zero are slower than reference, below zero are faster.</div>
                 <div className="telem-chart-card">
                   <DeltaChart
                     telData={telemetryData.map(td => td.data)}

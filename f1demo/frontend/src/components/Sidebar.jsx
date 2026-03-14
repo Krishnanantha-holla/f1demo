@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const icons = [
   { to: '/',             label: 'Dashboard',    d: 'M3,3h7v7H3ZM14,3h7v7H14ZM3,14h7v7H3ZM14,14h7v7H14Z' },
@@ -13,6 +13,33 @@ const icons = [
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [showTopFade, setShowTopFade] = useState(false);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+  const navRef = useRef(null);
+
+  useEffect(() => {
+    const node = navRef.current;
+    if (!node) return undefined;
+
+    const updateFade = () => {
+      const canScroll = node.scrollHeight > node.clientHeight + 2;
+      if (!canScroll) {
+        setShowTopFade(false);
+        setShowBottomFade(false);
+        return;
+      }
+      setShowTopFade(node.scrollTop > 4);
+      setShowBottomFade(node.scrollTop + node.clientHeight < node.scrollHeight - 4);
+    };
+
+    updateFade();
+    node.addEventListener('scroll', updateFade);
+    window.addEventListener('resize', updateFade);
+    return () => {
+      node.removeEventListener('scroll', updateFade);
+      window.removeEventListener('resize', updateFade);
+    };
+  }, []);
 
   return (
     <>
@@ -27,7 +54,9 @@ export default function Sidebar() {
         </svg>
       </button>
 
-      <nav className={`sidebar${collapsed ? ' open' : ''}`}>
+      <nav ref={navRef} className={`sidebar${collapsed ? ' open' : ''}`}>
+        <div className={`sidebar-scroll-fade top ${showTopFade ? 'visible' : ''}`} />
+        <div className={`sidebar-scroll-fade bottom ${showBottomFade ? 'visible' : ''}`} />
         <div className="sidebar-logo">F1</div>
         {icons.map((item) => (
           <NavLink

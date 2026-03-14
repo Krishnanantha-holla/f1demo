@@ -617,7 +617,14 @@ export default function Analysis() {
     <>
       <div className="page-header">
         <h1 className="page-title">Analysis</h1>
-        <span className="season-badge">TracingInsights + FastF1</span>
+        <button
+          type="button"
+          className="info-badge"
+          title="Data combines FastF1 and Tracing Insights sources depending on availability."
+          aria-label="Analysis data source information"
+        >
+          i
+        </button>
       </div>
 
       {/* Controls Bar */}
@@ -675,11 +682,11 @@ export default function Analysis() {
               onClick={loadData}
               disabled={status === 'loading' || selectedDrivers.length === 0}
             >
-              {status === 'loading' ? loadingStep : 'Load Data ▶'}
+              {status === 'loading' ? loadingStep : 'Load Analysis ▶'}
             </button>
             <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: '600' }}>
               <input type="checkbox" checked={hideOutliers} onChange={e => setHideOutliers(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--f1-red)', cursor: 'pointer' }} />
-              Hide outliers (&gt;107%)
+              Hide outlier laps (&gt;107%)
             </label>
           </div>
         </div>
@@ -689,7 +696,7 @@ export default function Analysis() {
       {status === 'error' && (
         <div className="card" style={{ marginBottom: '1.25rem' }}>
           <div className="card-body" style={{ padding: '2rem', textAlign: 'center' }}>
-            <ErrorMsg text="Failed to load data. The session may not be available yet. Data is typically available ~30 minutes after a session ends." />
+            <ErrorMsg text="Unable to load this session yet. Some datasets become available shortly after the session ends." />
           </div>
         </div>
       )}
@@ -727,6 +734,7 @@ export default function Analysis() {
           {isRace && (
             <div className="telem-section">
               <div className="telem-section-title">Position Changes</div>
+              <div className="axis-direction-hint">Axis note: top of the chart is P1, lower lines are further back.</div>
               <div className="card"><div className="card-body" style={{ padding: '1rem' }}>
                 <PositionChart data={lapData} colors={driverColors} drivers={selectedDrivers} />
               </div></div>

@@ -77,6 +77,27 @@ function fmtLap(secs) {
   return m > 0 ? `${m}:${s}` : s;
 }
 
+function valueOrDash(value) {
+  return value == null || value === '' ? '—' : value;
+}
+
+function normalizeTeamKey(name) {
+  if (!name) return '';
+  const raw = name.toLowerCase();
+  if (raw.includes('red bull') && !raw.includes('racing bulls') && raw !== 'rb') return 'red_bull_racing';
+  if (raw === 'rb' || raw.includes('racing bulls')) return 'racing_bulls';
+  if (raw.includes('aston martin')) return 'aston_martin';
+  if (raw.includes('mclaren')) return 'mclaren';
+  if (raw.includes('ferrari')) return 'ferrari';
+  if (raw.includes('mercedes')) return 'mercedes';
+  if (raw.includes('williams')) return 'williams';
+  if (raw.includes('alpine')) return 'alpine';
+  if (raw.includes('haas')) return 'haas';
+  if (raw.includes('sauber') || raw.includes('audi') || raw.includes('kick')) return 'sauber';
+  if (raw.includes('cadillac')) return 'cadillac';
+  return raw.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
 // ── Team Encyclopedia Profile (Slide-Over) ──
 function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
   const [detail, setDetail] = useState(null);
@@ -205,20 +226,20 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
           )}
 
           <div className="bio-section">
-            <p className="bio-text">{info.bio || `${team.team_name} is currently P${team.position_current} in the Constructors' Championship.`}</p>
+            <p className="bio-text">{info.bio || `${team.team_name} currently sits P${team.position_current} in the Constructors' Championship.`}</p>
           </div>
 
           <div className="stats-showcase">
             <div className="stat-hero">
-              <span className="stat-hero-val">{info.championships || 0}</span>
+              <span className="stat-hero-val">{valueOrDash(info.championships)}</span>
               <span className="stat-hero-label">World Titles</span>
             </div>
             <div className="stat-hero">
-              <span className="stat-hero-val">{info.wins || 0}</span>
+              <span className="stat-hero-val">{valueOrDash(info.wins)}</span>
               <span className="stat-hero-label">Wins</span>
             </div>
             <div className="stat-hero">
-              <span className="stat-hero-val" style={{ color }}>{team.points_current}</span>
+              <span className="stat-hero-val" style={{ color }}>{valueOrDash(team.points_current)}</span>
               <span className="stat-hero-label">Current Points</span>
             </div>
           </div>
@@ -298,6 +319,7 @@ export default function Constructors() {
   const [bios, setBios] = useState({});
   const [status, setStatus] = useState('loading');
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [driversByTeam, setDriversByTeam] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -324,6 +346,14 @@ export default function Constructors() {
           }
         });
 
+        const grouped = {};
+        uniqueDrivers.forEach((driver) => {
+          const key = normalizeTeamKey(driver.team_name);
+          if (!key) return;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(driver);
+        });
+
         const dsMap = {};
         if (Array.isArray(dsData)) {
           dsData.forEach(s => {
@@ -348,6 +378,7 @@ export default function Constructors() {
 
         setConstructors(sorted);
         setAllDrivers(uniqueDrivers);
+        setDriversByTeam(grouped);
         setDriverStandings(dsMap);
         setBios(bioData.constructors || {});
         setStatus('ok');
@@ -357,9 +388,9 @@ export default function Constructors() {
     })();
   }, []);
 
-  if (status === 'loading') return <Loading text="Accessing Factory Database..." />;
-  if (status === 'error') return <ErrorMsg text="Failed to load constructors. Jolpica/FastF1 might be down." />;
-  if (status === 'empty') return <ErrorMsg text="No constructor standings available." />;
+  if (status === 'loading') return <Loading text="Loading constructor standings..." />;
+  if (status === 'error') return <ErrorMsg text="Unable to load constructor standings right now." />;
+  if (status === 'empty') return <ErrorMsg text="No constructor standings available yet." />;
 
   const maxPts = Math.max(...constructors.map(c => c.points_current), 1);
 
@@ -382,25 +413,8 @@ export default function Constructors() {
           const carCandidates = getCarImageCandidates(team.team_name);
           const carImg = carCandidates[0] || null;
 
-          // Get the two main drivers for the team
-          const teamDrivers = allDrivers
-            .filter(d => {
-              if (!d.team_name || !team.team_name) return false;
-              const a = team.team_name.toLowerCase();
-              const b = d.team_name.toLowerCase();
-              if (a.includes('red bull')) return b.includes('red bull');
-              if (a === 'rb' || a.includes('racing bulls')) return b === 'rb' || b.includes('racing bulls');
-              if (a.includes('aston martin')) return b.includes('aston martin');
-              if (a.includes('haas')) return b.includes('haas');
-              if (a.includes('audi') || a.includes('sauber')) return b.includes('audi') || b.includes('sauber');
-              if (a.includes('alpine')) return b.includes('alpine');
-              if (a.includes('mclaren')) return b.includes('mclaren');
-              if (a.includes('ferrari')) return b.includes('ferrari');
-              if (a.includes('mercedes')) return b.includes('mercedes');
-              if (a.includes('williams')) return b.includes('williams');
-              if (a.includes('cadillac')) return b.includes('cadillac');
-              return a.includes(b.split(' ')[0]) || b.includes(a.split(' ')[0]);
-            })
+          const teamDrivers = (driversByTeam[normalizeTeamKey(team.team_name)] || allDrivers
+            .filter(d => normalizeTeamKey(d.team_name) === normalizeTeamKey(team.team_name)))
             .sort((a, b) => {
               const pA = driverStandings[a.driver_number]?.points_current || 0;
               const pB = driverStandings[b.driver_number]?.points_current || 0;

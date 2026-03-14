@@ -64,11 +64,30 @@ function advanceCarFallback(e, candidates) {
   e.currentTarget.style.display = 'none';
 }
 
-function legacyBand(championships = 0, wins = 0) {
-  if (championships >= 4 || wins >= 60) return 'Dynasty Era';
-  if (championships >= 1 || wins >= 8) return 'Proven Winner';
-  if (wins >= 1) return 'Breakthrough Winner';
-  return 'Rising Legacy';
+function statValueOrDash(value) {
+  return value == null || value === '' ? '—' : value;
+}
+
+function numericOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function legacyBand(championships, wins) {
+  const titles = numericOrNull(championships);
+  const raceWins = numericOrNull(wins);
+  if (titles == null && raceWins == null) return 'Data pending';
+  if ((titles ?? 0) >= 4 || (raceWins ?? 0) >= 60) return 'Dynasty Era';
+  if ((titles ?? 0) >= 1 || (raceWins ?? 0) >= 8) return 'Proven Winner';
+  if ((raceWins ?? 0) >= 1) return 'Breakthrough Winner';
+  return 'Developing Career';
+}
+
+function shortBioText(driver, bio) {
+  const source = (bio || '').trim();
+  if (!source) return `${driver.full_name} races for ${driver.team_name}.`;
+  const sentence = source.split('. ')[0].trim().replace(/[.]+$/, '');
+  return `${sentence}.`;
 }
 
 function getDriverHeadshot(driver) {
@@ -179,20 +198,20 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
 
         <div className="panel-scroll-content">
           <div className="bio-section">
-            <p className="bio-text">{info.bio || `${driver.full_name} drives for ${driver.team_name}.`}</p>
+            <p className="bio-text">{shortBioText(driver, info.bio)}</p>
           </div>
 
           <div className="stats-showcase">
             <div className="stat-hero">
-              <span className="stat-hero-val">{info.championships || 0}</span>
+              <span className="stat-hero-val">{statValueOrDash(info.championships)}</span>
               <span className="stat-hero-label">World Titles</span>
             </div>
             <div className="stat-hero">
-              <span className="stat-hero-val">{info.wins || 0}</span>
+              <span className="stat-hero-val">{statValueOrDash(info.wins)}</span>
               <span className="stat-hero-label">Wins</span>
             </div>
             <div className="stat-hero">
-              <span className="stat-hero-val">{info.podiums || 0}</span>
+              <span className="stat-hero-val">{statValueOrDash(info.podiums)}</span>
               <span className="stat-hero-label">Podiums</span>
             </div>
           </div>
@@ -344,7 +363,7 @@ export default function Drivers() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Drivers</h1>
-          <div className="page-subtitle">Season roster with free-mode data fallback when live endpoints are restricted.</div>
+          <div className="page-subtitle">Season roster with resilient coverage across live and archived data feeds.</div>
         </div>
         <span className="season-badge">Season {new Date().getFullYear()}</span>
       </div>
@@ -363,7 +382,7 @@ export default function Drivers() {
             const teamCarCandidates = getCarImageCandidates(d.team_name);
             const teamCar = teamCarCandidates[0] || null;
             const bio = bios?.[String(d.driver_number)] || {};
-            const legacy = legacyBand(bio.championships || 0, bio.wins || 0);
+            const legacy = legacyBand(bio.championships, bio.wins);
             const teammate = drivers.find(td => td.team_name === d.team_name && td.driver_number !== d.driver_number) || null;
             const teammatePoints = teammate ? (standings[teammate.driver_number]?.points || 0) : null;
             return (
@@ -426,26 +445,26 @@ export default function Drivers() {
                 </div>
 
                 <div className="expand-hint">
-                  <span className="click-hint">{isExpanded ? 'Tap to collapse' : 'Tap to expand dossier'}</span>
+                  <span className="click-hint">{isExpanded ? 'Tap to collapse' : 'Tap to view quick profile'}</span>
                 </div>
 
                 <div className="detail-expand">
                   <div className="detail-stats">
-                    <div className="stat-box"><div className="stat-val">{bio.championships || 0}</div><div className="stat-label">Titles</div></div>
-                    <div className="stat-box"><div className="stat-val">{bio.wins || 0}</div><div className="stat-label">Career Wins</div></div>
-                    <div className="stat-box"><div className="stat-val">{s?.wins ?? 0}</div><div className="stat-label">Season Wins</div></div>
+                    <div className="stat-box"><div className="stat-val">{statValueOrDash(bio.championships)}</div><div className="stat-label">Titles</div></div>
+                    <div className="stat-box"><div className="stat-val">{statValueOrDash(bio.wins)}</div><div className="stat-label">Career Wins</div></div>
+                    <div className="stat-box"><div className="stat-val">{statValueOrDash(s?.wins)}</div><div className="stat-label">Season Wins</div></div>
                   </div>
 
                   <div className="detail-laps">
                     <div className="detail-laps-title">Legacy Snapshot</div>
-                    <div className="detail-lap-row"><span>Legacy Tier</span><strong>{legacy}</strong></div>
+                    <div className="detail-lap-row"><span>Career Tier</span><strong>{legacy}</strong></div>
                     <div className="detail-lap-row"><span>Career Podiums</span><strong>{bio.podiums ?? '—'}</strong></div>
                     <div className="detail-lap-row"><span>Career Points</span><strong>{bio.career_points ?? '—'}</strong></div>
                     <div className="detail-lap-row"><span>Teammate</span><strong>{teammate ? teammate.name_acronym || teammate.last_name : 'TBD'}</strong></div>
                     <div className="detail-lap-row"><span>Garage Delta</span><strong>{teammatePoints != null && s ? `${(s.points - teammatePoints) >= 0 ? '+' : ''}${(s.points - teammatePoints).toFixed(0)} pts` : '—'}</strong></div>
                   </div>
 
-                  <div className="driver-inline-bio">{(bio.bio || `${d.full_name} is competing for ${d.team_name}.`).split('. ')[0]}.</div>
+                  <div className="driver-inline-bio">{shortBioText(d, bio.bio)}</div>
 
                   <div className="driver-inline-actions">
                     <button
@@ -456,7 +475,7 @@ export default function Drivers() {
                         setModalDriver(d.driver_number);
                       }}
                     >
-                      Open Full Legacy Profile
+                      Open Full Driver Profile
                     </button>
                   </div>
                 </div>

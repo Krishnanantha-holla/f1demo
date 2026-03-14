@@ -80,10 +80,28 @@ function formatLapTime(seconds) {
   return `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(3).padStart(6, '0')}`;
 }
 
+function isSessionInProgress(session) {
+  if (!session?.date_start || !session?.date_end) return false;
+  const now = Date.now();
+  const start = new Date(session.date_start).getTime();
+  const end = new Date(session.date_end).getTime();
+  return Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end;
+}
+
+function sessionElapsedLabel(session) {
+  if (!isSessionInProgress(session)) return null;
+  const elapsedMs = Date.now() - new Date(session.date_start).getTime();
+  const totalMinutes = Math.max(Math.floor(elapsedMs / 60000), 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours}h ${minutes}m elapsed` : `${minutes}m elapsed`;
+}
+
 function LiveBanner({ modeMeta, freeContext }) {
   const currentEvent = freeContext?.current_event || null;
   const currentSession = modeMeta?.session || freeContext?.current_session || null;
-  const shouldShow = modeMeta?.mode === 'live' || !!currentEvent;
+  const inProgress = isSessionInProgress(currentSession);
+  const shouldShow = modeMeta?.mode === 'live' || !!currentEvent || inProgress;
 
   if (!shouldShow) return null;
 
@@ -94,7 +112,8 @@ function LiveBanner({ modeMeta, freeContext }) {
         {currentSession?.session_name || 'Session in progress'}
         {currentEvent ? ` • ${eventName(currentEvent)}` : ''}
       </span>
-      {modeMeta?.reason === 'openf1_live_restricted' && <span className="live-banner-pill">Free Mode</span>}
+      {inProgress && <span className="live-banner-pill">In Progress</span>}
+      {modeMeta?.reason === 'openf1_live_restricted' && <span className="live-banner-pill">Live Data Limited</span>}
     </div>
   );
 }
@@ -194,6 +213,7 @@ function LiveSession({ drivers, modeMeta, freeContext }) {
   const [positions, setPositions] = useState([]);
   const [laps, setLaps] = useState({});
   const [status, setStatus] = useState('loading');
+  const [tick, setTick] = useState(Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -259,29 +279,71 @@ function LiveSession({ drivers, modeMeta, freeContext }) {
   const currentEvent = freeContext?.current_event || null;
   const currentSession = modeMeta?.session || freeContext?.current_session || null;
   const schedule = eventSessionList(currentEvent);
+  const activeSession = session || currentSession;
+  const activeInProgress = isSessionInProgress(activeSession);
+  const elapsed = sessionElapsedLabel(activeSession);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Use tick to keep elapsed label fresh while session is active.
+  const activeElapsed = activeInProgress ? sessionElapsedLabel(activeSession) : elapsed;
+  void tick;
 
   return (
     <div className="card live-session-card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span className="card-title">Live Session</span>
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          {status === 'ok'
-            ? `${session?.session_name || currentSession?.session_name} — ${session?.circuit_short_name || currentEvent?.Location || ''}`
-            : currentEvent
-              ? `${currentSession?.session_name || 'Current weekend'} — ${eventName(currentEvent)}`
-              : 'No active session'}
-        </span>
+        <div className="live-session-meta">
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            {status === 'ok'
+              ? `${session?.session_name || currentSession?.session_name} — ${session?.circuit_short_name || currentEvent?.Location || ''}`
+              : currentEvent
+                ? `${currentSession?.session_name || 'Current weekend'} — ${eventName(currentEvent)}`
+                : 'Session watch'}
+          </span>
+          {activeInProgress && (
+            <span className="dashboard-pill dashboard-pill-live">In Progress{activeElapsed ? ` • ${activeElapsed}` : ''}</span>
+          )}
+        </div>
       </div>
       <div className="card-body">
         {status === 'loading' && <Loading text="Loading session..." />}
         {status === 'error' && <EmptyMsg text="Live session temporarily unavailable." />}
-        {status === 'empty' && <EmptyMsg text="No active live session" />}
+        {status === 'empty' && (
+          <div className="free-mode-panel">
+            <div className="free-mode-copy">
+              <div className="free-mode-title">No active timing feed right now.</div>
+              <div className="free-mode-text">
+                This panel stays active and automatically switches to live timing the moment an on-track session starts.
+              </div>
+            </div>
+            {schedule.length > 0 && (
+              <div className="session-stack compact">
+                {schedule.map((sessionRow) => {
+                  const active = sessionRow.name === currentSession?.session_name;
+                  return (
+                    <div key={`${sessionRow.name}-${sessionRow.date}`} className={`session-row ${active ? 'active' : ''}`}>
+                      <div>
+                        <div className="session-row-name">{sessionRow.name}</div>
+                        <div className="session-row-date">{formatDateFull(sessionRow.date)}</div>
+                      </div>
+                      <span className={`dashboard-pill ${active ? 'dashboard-pill-live' : ''}`}>{active ? 'Now' : 'Upcoming'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {status === 'restricted' && (
           <div className="free-mode-panel">
             <div className="free-mode-copy">
-              <div className="free-mode-title">Free mode keeps the current weekend visible.</div>
+              <div className="free-mode-title">Weekend tracker remains active.</div>
               <div className="free-mode-text">
-                Live telemetry is paywalled right now, but this card will keep refreshing the active event and session schedule automatically.
+                Detailed live timing is temporarily unavailable, but this card keeps refreshing the active weekend and session schedule automatically.
               </div>
             </div>
             <div className="session-stack compact">
@@ -564,7 +626,7 @@ export default function Dashboard() {
       <div className="page-header dashboard-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <div className="page-subtitle">Reliable race-weekend tracking with free-mode fallbacks.</div>
+          <div className="page-subtitle">Live weekend tracking with resilient fallback coverage.</div>
         </div>
         <span className="season-badge">Season {new Date().getFullYear()}</span>
       </div>
