@@ -554,6 +554,9 @@ export default function Analysis() {
         const laps = await api.fastf1Laps(year, selectedEvent, sessionNames[sessionType]);
         if (Array.isArray(laps)) {
           allLapData = selectedDrivers.map(code => laps.filter(l => l.Driver === code));
+        } else if (laps?.data && Array.isArray(laps.data)) {
+          // Paginated response
+          allLapData = selectedDrivers.map(code => laps.data.filter(l => l.Driver === code));
         }
       } catch {
         // Fallback to TracingInsights

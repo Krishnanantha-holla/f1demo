@@ -224,9 +224,14 @@ export default function Calendar() {
   const [selectedMeeting, setSelectedMeeting] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const [m, driverData] = await Promise.all([api.meetings(), api.drivers()]);
+        const [m, driverData] = await Promise.all([
+          api.meetings(),
+          api.drivers().catch((err) => { console.warn('[Calendar] drivers failed', err); return []; }),
+        ]);
+        if (cancelled) return;
         m.sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
         setMeetings(m);
 
@@ -284,10 +289,12 @@ export default function Calendar() {
         setResults(resultsByMeeting);
         setMapDataByKey(mapByKey);
         setStatus('ok');
-      } catch {
-        setStatus('error');
+      } catch (err) {
+        console.error('[Calendar] load failed', err);
+        if (!cancelled) setStatus('error');
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   function isPast(dateStr) {

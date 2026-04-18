@@ -130,12 +130,14 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
   }, [handleClose]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const allLaps = await Promise.all(
           teamDrivers.map(d => api.laps(undefined, d.driver_number).catch(() => []))
         );
         const allPits = await api.pits().catch(() => []);
+        if (cancelled) return;
 
         let totalLaps = 0, bestLap = null, pitTotal = 0;
         const lapsByDriver = {};
@@ -155,10 +157,12 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
 
         setDetail({ totalLaps, bestLap, pitTotal });
         setDriverLapData(lapsByDriver);
-      } catch {
-        setDetail({ error: true });
+      } catch (err) {
+        console.warn('[TeamProfile] detail fetch failed', err);
+        if (!cancelled) setDetail({ error: true });
       }
     })();
+    return () => { cancelled = true; };
   }, [teamDrivers]);
 
   const carCandidates = getCarImageCandidates(team.team_name);
@@ -322,15 +326,18 @@ export default function Constructors() {
   const [driversByTeam, setDriversByTeam] = useState({});
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const [stData, drvData, freeRoster, dsData, bioData] = await Promise.all([
-          api.constructorStandings().catch(() => []),
-          api.drivers().catch(() => []),
-          api.freeRoster().catch(() => []),
-          api.driverStandings().catch(() => []),
-          api.bios().catch(() => ({ constructors: {} }))
+          api.constructorStandings().catch((err) => { console.warn('[Constructors] standings failed', err); return []; }),
+          api.drivers().catch((err) => { console.warn('[Constructors] drivers failed', err); return []; }),
+          api.freeRoster().catch((err) => { console.warn('[Constructors] freeRoster failed', err); return []; }),
+          api.driverStandings().catch((err) => { console.warn('[Constructors] driverStandings failed', err); return []; }),
+          api.bios().catch((err) => { console.warn('[Constructors] bios failed', err); return { constructors: {} }; }),
         ]);
+
+        if (cancelled) return;
 
         if (!stData || stData.length === 0) {
           setStatus('empty');
@@ -383,9 +390,11 @@ export default function Constructors() {
         setBios(bioData.constructors || {});
         setStatus('ok');
       } catch (e) {
-        setStatus('error');
+        console.error('[Constructors] load failed', e);
+        if (!cancelled) setStatus('error');
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   if (status === 'loading') return <Loading text="Loading constructor standings..." />;

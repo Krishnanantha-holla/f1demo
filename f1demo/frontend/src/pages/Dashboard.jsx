@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, getTeamColor } from '../api';
 import { Loading, ErrorMsg, EmptyMsg, formatDate, formatDateFull, pad } from '../components/Shared';
@@ -288,10 +288,6 @@ function LiveSession({ drivers, modeMeta, freeContext }) {
     return () => clearInterval(id);
   }, []);
 
-  // Use tick to keep elapsed label fresh while session is active.
-  const activeElapsed = activeInProgress ? sessionElapsedLabel(activeSession) : elapsed;
-  void tick;
-
   return (
     <div className="card live-session-card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -405,7 +401,7 @@ function DriverStandings({ drivers }) {
   useEffect(() => {
     api.driverStandings()
       .then((result) => { setData(result); setStatus(result.length ? 'ok' : 'empty'); })
-      .catch(() => setStatus('error'));
+      .catch((err) => { console.warn('[DriverStandings]', err); setStatus('error'); });
   }, []);
 
   return (
@@ -457,7 +453,7 @@ function ConstructorStandings({ drivers }) {
   useEffect(() => {
     api.constructorStandings()
       .then((result) => { setData(result); setStatus(result.length ? 'ok' : 'empty'); })
-      .catch(() => setStatus('error'));
+      .catch((err) => { console.warn('[ConstructorStandings]', err); setStatus('error'); });
   }, []);
 
   return (
@@ -567,26 +563,34 @@ function CalendarMini({ schedule, currentEvent }) {
 }
 
 export default function Dashboard() {
-  const [drivers, setDrivers] = useState({});
+  const [openF1Drivers, setOpenF1Drivers] = useState([]);
+  const [freeRoster, setFreeRoster] = useState([]);
   const [freeContext, setFreeContext] = useState({ schedule: [] });
   const [modeMeta, setModeMeta] = useState({ mode: 'idle' });
   const [loading, setLoading] = useState(true);
+
+  // Memoize the merge so it only recomputes when inputs change, not on every render
+  const drivers = useMemo(
+    () => mergeDriverMaps(openF1Drivers, freeRoster),
+    [openF1Drivers, freeRoster],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadInitial() {
       try {
-        const [openF1Drivers, freeRoster, context, mode] = await Promise.all([
-          api.drivers().catch(() => []),
-          api.freeRoster().catch(() => []),
-          api.freeContext().catch(() => ({ schedule: [] })),
-          api.sessionMode().catch(() => ({ mode: 'idle' })),
+        const [driversData, rosterData, context, mode] = await Promise.all([
+          api.drivers().catch((err) => { console.warn('[Dashboard] drivers fetch failed', err); return []; }),
+          api.freeRoster().catch((err) => { console.warn('[Dashboard] freeRoster fetch failed', err); return []; }),
+          api.freeContext().catch((err) => { console.warn('[Dashboard] freeContext fetch failed', err); return { schedule: [] }; }),
+          api.sessionMode().catch((err) => { console.warn('[Dashboard] sessionMode fetch failed', err); return { mode: 'idle' }; }),
         ]);
 
         if (cancelled) return;
 
-        setDrivers(mergeDriverMaps(openF1Drivers || [], freeRoster || []));
+        setOpenF1Drivers(driversData || []);
+        setFreeRoster(rosterData || []);
         setFreeContext(context || { schedule: [] });
         setModeMeta(mode || { mode: 'idle' });
       } finally {
@@ -597,13 +601,15 @@ export default function Dashboard() {
     async function refreshDynamic() {
       try {
         const [context, mode] = await Promise.all([
-          api.freeContext().catch(() => ({ schedule: [] })),
-          api.sessionMode().catch(() => ({ mode: 'idle' })),
+          api.freeContext().catch((err) => { console.warn('[Dashboard] refresh freeContext failed', err); return { schedule: [] }; }),
+          api.sessionMode().catch((err) => { console.warn('[Dashboard] refresh sessionMode failed', err); return { mode: 'idle' }; }),
         ]);
         if (cancelled) return;
         setFreeContext(context || { schedule: [] });
         setModeMeta(mode || { mode: 'idle' });
-      } catch {}
+      } catch (err) {
+        console.warn('[Dashboard] refreshDynamic failed', err);
+      }
     }
 
     loadInitial();

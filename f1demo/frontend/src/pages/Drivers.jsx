@@ -126,6 +126,7 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
   }, [handleClose]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const [lapData, pitData, stintData] = await Promise.all([
@@ -133,6 +134,7 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
           api.pits().catch(() => []),
           api.stints().catch(() => []),
         ]);
+        if (cancelled) return;
         const driverLaps = Array.isArray(lapData) ? lapData.filter(l => l.driver_number === driver.driver_number) : [];
         const driverPits = Array.isArray(pitData) ? pitData.filter(p => p.driver_number === driver.driver_number) : [];
         const driverStints = Array.isArray(stintData) ? stintData.filter(s => s.driver_number === driver.driver_number) : [];
@@ -141,7 +143,6 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
         const bestLap = lapTimes.length ? Math.min(...lapTimes) : null;
         const avgLap = lapTimes.length ? lapTimes.reduce((a, b) => a + b, 0) / lapTimes.length : null;
 
-        // Sector consistency
         const s1 = driverLaps.filter(l => l.duration_sector_1 > 0).map(l => l.duration_sector_1);
         const s2 = driverLaps.filter(l => l.duration_sector_2 > 0).map(l => l.duration_sector_2);
         const s3 = driverLaps.filter(l => l.duration_sector_3 > 0).map(l => l.duration_sector_3);
@@ -157,10 +158,12 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
           bestS1, bestS2, bestS3,
           tyres: driverStints.map(s => s.compound).filter(Boolean),
         });
-      } catch {
-        setDetail({ error: true });
+      } catch (err) {
+        console.warn('[PilotProfile] detail fetch failed', err);
+        if (!cancelled) setDetail({ error: true });
       }
     })();
+    return () => { cancelled = true; };
   }, [driver.driver_number]);
 
   return (
@@ -268,7 +271,7 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
                     {detail.tyres.map((t, i) => {
                       const c = { SOFT: '#e10600', MEDIUM: '#ffd700', HARD: '#e8e8ee', INTERMEDIATE: '#00d26a', WET: '#00d4ff' };
                       return (
-                        <div key={i} className="modal-lap-chip" style={{ borderColor: c[t.toUpperCase()] || 'var(--border)' }}>
+                        <div key={`${t}-${i}`} className="modal-lap-chip" style={{ borderColor: c[t.toUpperCase()] || 'var(--border)' }}>
                           <span style={{ color: c[t.toUpperCase()] || 'var(--text)', fontWeight: 700 }}>{t}</span>
                           <span className="modal-lap-chip-label">Stint {i + 1}</span>
                         </div>
@@ -306,14 +309,17 @@ export default function Drivers() {
   const [modalDriver, setModalDriver] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const [driverData, freeRoster, standingsData, bioData] = await Promise.all([
-          api.drivers().catch(() => []),
-          api.freeRoster().catch(() => []),
-          api.driverStandings().catch(() => []),
-          api.bios().catch(() => ({ drivers: {} }))
+          api.drivers().catch((err) => { console.warn('[Drivers] drivers fetch failed', err); return []; }),
+          api.freeRoster().catch((err) => { console.warn('[Drivers] freeRoster fetch failed', err); return []; }),
+          api.driverStandings().catch((err) => { console.warn('[Drivers] standings fetch failed', err); return []; }),
+          api.bios().catch((err) => { console.warn('[Drivers] bios fetch failed', err); return { drivers: {} }; }),
         ]);
+
+        if (cancelled) return;
 
         const merged = new Map();
         (freeRoster || []).forEach(d => merged.set(d.driver_number, { ...d }));
@@ -348,10 +354,12 @@ export default function Drivers() {
         });
         setStandings(sMap);
         setStatus(mergedDrivers.length ? 'ok' : 'empty');
-      } catch {
+      } catch (err) {
+        console.error('[Drivers] load failed', err);
         setStatus('error');
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const maxPoints = drivers.length > 0

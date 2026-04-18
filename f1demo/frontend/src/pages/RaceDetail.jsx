@@ -617,6 +617,7 @@ export default function RaceDetail() {
   const [allLapData, setAllLapData] = useState({});
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         // 1. Get meeting & sessions info
@@ -625,6 +626,8 @@ export default function RaceDetail() {
           api.sessionsForMeeting(meetingKey),
           api.drivers(),
         ]);
+
+        if (cancelled) return;
 
         const mtg = meetingsData.find(m => String(m.meeting_key) === String(meetingKey));
         setMeeting(mtg);
@@ -707,9 +710,10 @@ export default function RaceDetail() {
         setStatus('ok');
       } catch (e) {
         console.error('RaceDetail load error:', e);
-        setStatus('error');
+        if (!cancelled) setStatus('error');
       }
     })();
+    return () => { cancelled = true; };
   }, [meetingKey]);
 
   if (status === 'loading') return <Loading text="Loading race data..." />;
