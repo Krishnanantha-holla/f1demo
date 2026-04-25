@@ -7,10 +7,10 @@ import json
 import asyncio
 import os
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request
+from fastapi import FastAPI, WebSocket, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -18,6 +18,16 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import httpx
 import requests as sync_requests
+
+from cache_store import cache_backend_name, cache_clear, cache_lookup, cache_write
+from services.free_context import (
+    build_free_context,
+    current_year as svc_current_year,
+    ensure_utc as svc_ensure_utc,
+    event_session_windows as svc_event_session_windows,
+)
+from services.live_stream import openf1_json_tail, stream_live_session
+from services.news_service import fetch_news
 
 # ── Structured logging ──
 logging.basicConfig(
@@ -56,31 +66,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── In-memory Cache ──
-CACHE: dict = {}
 CACHE_TTL = 60  # seconds
 
 
 def cached_get_sync(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
-    """Synchronous GET with in-memory cache."""
-    now = time.time()
-    if url in CACHE and now - CACHE[url]["ts"] < ttl:
-        return CACHE[url]["data"]
+    """Synchronous GET with cache (memory + optional Redis)."""
+    data, hit = cache_lookup(url, ttl)
+    if hit:
+        return data
     resp = sync_requests.get(url, timeout=15)
     if resp.status_code == 404:
         logger.debug("404 from %s", url)
         return None
     resp.raise_for_status()
     data = resp.json()
-    CACHE[url] = {"data": data, "ts": now}
+    cache_write(url, data, ttl)
     return data
 
 
 async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
-    """Async GET with in-memory cache."""
-    now = time.time()
-    if url in CACHE and now - CACHE[url]["ts"] < ttl:
-        return CACHE[url]["data"]
+    """Async GET with cache (memory + optional Redis)."""
+    data, hit = cache_lookup(url, ttl)
+    if hit:
+        return data
     async with httpx.AsyncClient(timeout=15.0) as client:
         headers = await _openf1_headers()
         resp = await client.get(url, headers=headers)
@@ -95,7 +103,7 @@ async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
             logger.warning("Upstream server error %s from %s", resp.status_code, url)
         resp.raise_for_status()
         data = resp.json()
-    CACHE[url] = {"data": data, "ts": now}
+    cache_write(url, data, ttl)
     return data
 
 
@@ -110,115 +118,20 @@ async def safe_cached_get(url: str, default, ttl: int = CACHE_TTL):
 
 
 def current_year() -> int:
-    return datetime.now().year
-
-
-def _ensure_utc(dt_value):
-    if dt_value is None:
-        return None
-    if hasattr(dt_value, "to_pydatetime"):
-        dt_value = dt_value.to_pydatetime()
-    if getattr(dt_value, "tzinfo", None) is None:
-        return dt_value.replace(tzinfo=timezone.utc)
-    return dt_value.astimezone(timezone.utc)
-
-
-def _serialize_value(value):
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return value
-
-
-def _serialize_event_row(row) -> dict:
-    data = row.to_dict() if hasattr(row, "to_dict") else dict(row)
-    return {key: _serialize_value(value) for key, value in data.items()}
+    return svc_current_year()
 
 
 def _event_session_windows(row) -> list[dict]:
-    windows = []
-    for index in range(1, 6):
-        session_name = row.get(f"Session{index}")
-        session_start = row.get(f"Session{index}DateUtc")
-        if not session_name or session_start is None:
-            continue
-        start = _ensure_utc(session_start)
-        if start is None:
-            continue
-
-        next_start = None
-        for next_index in range(index + 1, 6):
-            candidate = row.get(f"Session{next_index}DateUtc")
-            if candidate is not None:
-                next_start = _ensure_utc(candidate)
-                break
-
-        duration_hours = 4 if session_name in {"Race", "Sprint"} else 2
-        end = next_start if next_start and next_start > start else start + timedelta(hours=duration_hours)
-        windows.append({
-            "name": session_name,
-            "start": start,
-            "end": end,
-        })
-    return windows
+    return svc_event_session_windows(row)
 
 
 def _build_free_context(year: int | None = None) -> dict:
-    yr = year or current_year()
-    now = datetime.now(timezone.utc)
+    ff1 = fastf1 if HAS_FASTF1 else None
+    return build_free_context(HAS_FASTF1, ff1, year=year)
 
-    context = {
-        "year": yr,
-        "now": now.isoformat(),
-        "current_event": None,
-        "current_session": None,
-        "next_event": None,
-        "last_event": None,
-    }
 
-    if not HAS_FASTF1:
-        return context
-
-    try:
-        schedule = fastf1.get_event_schedule(yr, include_testing=False)
-    except Exception:
-        return context
-
-    serialized_rows = []
-    for _, row in schedule.iterrows():
-        serialized_rows.append(_serialize_event_row(row))
-        event_date = _ensure_utc(row.get("EventDate"))
-        first_session = None
-        for index in range(1, 6):
-            candidate = _ensure_utc(row.get(f"Session{index}DateUtc"))
-            if candidate is not None:
-                first_session = candidate
-                break
-        event_end = event_date + timedelta(days=1) if event_date else None
-
-        if event_end and event_end < now:
-            context["last_event"] = _serialize_event_row(row)
-
-        if first_session and first_session > now and context["next_event"] is None:
-            context["next_event"] = _serialize_event_row(row)
-
-        if first_session and event_end and first_session <= now <= event_end and context["current_event"] is None:
-            context["current_event"] = _serialize_event_row(row)
-
-        for window in _event_session_windows(row):
-            if window["start"] <= now <= window["end"]:
-                context["current_event"] = _serialize_event_row(row)
-                context["current_session"] = {
-                    "session_name": window["name"],
-                    "date_start": window["start"].isoformat(),
-                    "date_end": window["end"].isoformat(),
-                }
-                break
-
-        if context["current_event"]:
-            break
-
-    context["schedule"] = serialized_rows
-    return context
+def _ensure_utc(dt_value):
+    return svc_ensure_utc(dt_value)
 
 
 # ══════════════════════════════════════════
@@ -310,6 +223,12 @@ async def _openf1_headers(force_refresh: bool = False) -> dict:
 @app.get("/api/health")
 @limiter.limit("30/minute")
 async def health(request: Request):
+    payload: dict = {
+        "status": "degraded",
+        "openf1": "unreachable",
+        "cache_backend": cache_backend_name(),
+        "automator": None,
+    }
     try:
         async with httpx.AsyncClient(timeout=5.0) as c:
             r = await c.get(f"{OPENF1}/sessions?session_key=latest", headers=await _openf1_headers())
@@ -318,9 +237,28 @@ async def health(request: Request):
                     f"{OPENF1}/sessions?session_key=latest",
                     headers=await _openf1_headers(force_refresh=True),
                 )
-        return {"status": "ok" if r.status_code == 200 else "degraded"}
+        if r.status_code == 200:
+            payload["status"] = "ok"
+            payload["openf1"] = "ok"
+        else:
+            payload["openf1"] = f"http_{r.status_code}"
     except Exception:
-        return {"status": "degraded"}
+        pass
+
+    state_file = Path("./state.json")
+    if state_file.exists():
+        try:
+            st = state_file.stat()
+            age = time.time() - st.st_mtime
+            state = json.loads(state_file.read_text())
+            payload["automator"] = {
+                "mode": state.get("mode"),
+                "state_age_seconds": round(age, 1),
+            }
+        except Exception as exc:
+            payload["automator"] = {"error": str(exc)}
+
+    return payload
 
 
 # ══════════════════════════════════════════
@@ -687,14 +625,15 @@ async def team_radio(session_key: str = "latest", driver_number: int = None):
 async def circuit_map(circuit_key: int, year: int = None):
     yr = year or current_year()
     url = f"https://api.multiviewer.app/api/v1/circuits/{circuit_key}/{yr}"
-    now = time.time()
-    if url in CACHE and now - CACHE[url]["ts"] < 3600:
-        return CACHE[url]["data"]
+    cache_key = f"multiviewer:{circuit_key}:{yr}"
+    data, hit = cache_lookup(cache_key, 3600)
+    if hit:
+        return data
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(url, headers={"User-Agent": "f1-dashboard/2.0"})
         resp.raise_for_status()
         data = resp.json()
-    CACHE[url] = {"data": data, "ts": now}
+    cache_write(cache_key, data, 3600)
     return data
 
 
@@ -753,7 +692,7 @@ async def session_mode():
 # ══════════════════════════════════════════
 @app.post("/internal/refresh-cache")
 def refresh_cache():
-    CACHE.clear()
+    cache_clear()
     return {"status": "cache_cleared"}
 
 
@@ -815,131 +754,7 @@ async def ti_weather(year: int, event: str, session: str):
 # ══════════════════════════════════════════
 @app.get("/api/news")
 async def get_news():
-    try:
-        import feedparser
-    except ImportError:
-        logger.error("feedparser not installed")
-        return []
-    
-    # Expanded F1 RSS feeds with better sources
-    sources = [
-        {"url": "https://www.autosport.com/rss/feed/f1", "source": "Autosport"},
-        {"url": "https://www.motorsport.com/rss/f1/news/", "source": "Motorsport.com"},
-        {"url": "https://www.racefans.net/feed/", "source": "RaceFans"},
-        {"url": "https://www.planetf1.com/feed", "source": "PlanetF1"},
-        {"url": "https://www.crash.net/rss/f1", "source": "Crash.net"},
-        {"url": "https://www.gpfans.com/en/rss.xml", "source": "GPFans"},
-        {"url": "https://www.skysports.com/rss/12821", "source": "Sky Sports F1"},
-        {"url": "https://feeds.bbci.co.uk/sport/formula1/rss.xml", "source": "BBC Sport F1"},
-        {"url": "https://www.formula1.com/content/fom-website/en/latest/all.xml", "source": "Formula1.com"},
-    ]
-    
-    cache_key = "news_feed_v2"
-    now = time.time()
-    # Cache news for 15 minutes (more frequent updates)
-    if cache_key in CACHE and now - CACHE[cache_key]["ts"] < 900:
-        return CACHE[cache_key]["data"]
-
-    articles = []
-    
-    async def fetch_feed(source):
-        try:
-            async with httpx.AsyncClient(
-                timeout=12.0, 
-                follow_redirects=True, 
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-                    "Accept": "application/rss+xml, application/xml, text/xml, */*",
-                }
-            ) as client:
-                resp = await client.get(source["url"])
-                if resp.status_code != 200:
-                    logger.warning("Feed %s returned %s", source["source"], resp.status_code)
-                    return
-                
-                feed = feedparser.parse(resp.content)
-                
-                for entry in feed.entries[:10]:  # Top 10 per source
-                    # Extract image
-                    image_url = None
-                    if hasattr(entry, 'media_content') and len(entry.media_content) > 0:
-                        image_url = entry.media_content[0].get('url')
-                    elif hasattr(entry, 'media_thumbnail') and len(entry.media_thumbnail) > 0:
-                        image_url = entry.media_thumbnail[0].get('url')
-                    elif hasattr(entry, 'enclosures') and len(entry.enclosures) > 0:
-                        enc = entry.enclosures[0]
-                        if hasattr(enc, 'type') and 'image' in enc.type:
-                            image_url = enc.href
-                    
-                    # Extract description/summary
-                    summary = ''
-                    if hasattr(entry, 'summary'):
-                        summary = entry.summary
-                    elif hasattr(entry, 'description'):
-                        summary = entry.description
-                    
-                    # Get published date
-                    published = ''
-                    if hasattr(entry, 'published'):
-                        published = entry.published
-                    elif hasattr(entry, 'updated'):
-                        published = entry.updated
-                        
-                    articles.append({
-                        "title": entry.title if hasattr(entry, 'title') else 'Untitled',
-                        "link": entry.link if hasattr(entry, 'link') else '',
-                        "published": published,
-                        "source": source["source"],
-                        "image": image_url,
-                        "summary": summary[:300] if summary else '',  # Limit summary length
-                    })
-                    
-                logger.info("Fetched %d articles from %s", len(feed.entries[:10]), source["source"])
-        except Exception as exc:
-            logger.warning("Failed to fetch feed %s: %s", source["source"], exc)
-
-    await asyncio.gather(*(fetch_feed(s) for s in sources))
-    
-    if not articles:
-        logger.warning("No articles fetched from any source")
-        return []
-    
-    # Sort by date (most feeds use RFC 822 or ISO format)
-    import email.utils
-    import dateutil.parser
-    
-    def parse_date(date_str):
-        if not date_str:
-            return 0
-        try:
-            # Try RFC 822 first (most RSS feeds)
-            parsed = email.utils.parsedate_tz(date_str)
-            if parsed:
-                return email.utils.mktime_tz(parsed)
-        except:
-            pass
-        try:
-            # Try ISO format
-            dt = dateutil.parser.parse(date_str)
-            return dt.timestamp()
-        except:
-            pass
-        return 0
-        
-    articles.sort(key=lambda x: parse_date(x.get("published", "")), reverse=True)
-    
-    # Deduplicate by title (case-insensitive)
-    seen_titles = set()
-    unique_articles = []
-    for article in articles:
-        title_lower = article['title'].lower()
-        if title_lower not in seen_titles:
-            seen_titles.add(title_lower)
-            unique_articles.append(article)
-    
-    logger.info("Returning %d unique articles", len(unique_articles))
-    CACHE[cache_key] = {"data": unique_articles[:50], "ts": now}  # Return top 50
-    return unique_articles[:50]
+    return await fetch_news(cache_lookup, cache_write, logger)
 
 @app.get("/api/bios")
 def get_bios():
@@ -953,45 +768,19 @@ def get_bios():
 # ══════════════════════════════════════════
 # WEBSOCKET: LIVE TIMING
 # ══════════════════════════════════════════
+def _openf1_json_tail(resp: httpx.Response, tail: int):
+    return openf1_json_tail(resp, tail)
+
+
 @app.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
-    await websocket.accept()
-    logger.info("WebSocket client connected: %s", websocket.client)
-    try:
-        while True:
-            try:
-                async with httpx.AsyncClient(timeout=8.0) as c:
-                    pos = await c.get(f"{OPENF1}/position?session_key=latest")
-                    ivl = await c.get(f"{OPENF1}/intervals?session_key=latest")
-                    lap = await c.get(f"{OPENF1}/laps?session_key=latest")
-                    wthr = await c.get(f"{OPENF1}/weather?session_key=latest")
-                    rc = await c.get(f"{OPENF1}/race_control?session_key=latest")
-
-                await websocket.send_json({
-                    "positions": pos.json()[-25:] if pos.status_code == 200 else [],
-                    "intervals": ivl.json()[-25:] if ivl.status_code == 200 else [],
-                    "laps": lap.json()[-50:] if lap.status_code == 200 else [],
-                    "weather": wthr.json()[-1:] if wthr.status_code == 200 else [],
-                    "race_control": rc.json()[-5:] if rc.status_code == 200 else [],
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                })
-            except WebSocketDisconnect:
-                raise
-            except Exception as exc:
-                logger.warning("WebSocket poll error: %s", exc)
-                # Send an error frame so the client knows something went wrong
-                try:
-                    await websocket.send_json({"error": str(exc), "timestamp": datetime.now(timezone.utc).isoformat()})
-                except Exception:
-                    raise WebSocketDisconnect()
-            await asyncio.sleep(2)
-    except WebSocketDisconnect:
-        logger.info("WebSocket client disconnected: %s", websocket.client)
-    finally:
-        try:
-            await websocket.close()
-        except Exception:
-            pass
+    await stream_live_session(
+        websocket,
+        openf1_base=OPENF1,
+        openf1_auth_enabled=OPENF1_AUTH_ENABLED,
+        openf1_headers=_openf1_headers,
+        logger=logger,
+    )
 
 
 # ══════════════════════════════════════════
