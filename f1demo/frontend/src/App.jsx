@@ -7,6 +7,7 @@ import LiveCompanion from './components/LiveCompanion';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp';
 import { Loading } from './components/Shared';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useAppInit } from './hooks/useAppInit';
 
 // Code-split each page — only loads when navigated to
 const Dashboard    = lazy(() => import('./pages/Dashboard'));
@@ -19,6 +20,7 @@ const RaceDetail   = lazy(() => import('./pages/RaceDetail'));
 const NewsFeed     = lazy(() => import('./pages/NewsFeed'));
 
 export default function App() {
+  useAppInit();
   useKeyboardShortcuts();
 
   return (

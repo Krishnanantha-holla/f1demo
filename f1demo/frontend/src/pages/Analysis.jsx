@@ -2,6 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, getTeamColor } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';
+import SessionSelector from '../components/SessionSelector';
+import LapDeltaChart from '../components/LapDeltaChart';
+import PaceStrip from '../components/PaceStrip';
+import { useF1Store } from '../store/useF1Store';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 2017 }, (_, i) => CURRENT_YEAR - i);
@@ -9,6 +13,17 @@ const SESSION_TYPES = ['R', 'Q', 'FP1', 'FP2', 'FP3', 'SQ', 'SR', 'S'];
 const COMPOUND_COLORS = {
   SOFT: '#e10600', MEDIUM: '#f5c623', HARD: '#e8e8ee',
   INTERMEDIATE: '#45b649', WET: '#2d6dd1', UNKNOWN: '#888',
+};
+
+const SESSION_NAME_TO_CODE = {
+  'Race': 'R',
+  'Qualifying': 'Q',
+  'Sprint': 'S',
+  'Sprint Qualifying': 'SQ',
+  'Sprint Shootout': 'SQ',
+  'Practice 1': 'FP1',
+  'Practice 2': 'FP2',
+  'Practice 3': 'FP3',
 };
 
 function fmtTime(s) {
@@ -463,6 +478,7 @@ function ChartSkeleton() {
 // ═══════════════════════════════════════
 export default function Analysis() {
   const [searchParams] = useSearchParams();
+  const roster = useF1Store((state) => state.driverRoster);
 
   // Controls state
   const [year, setYear] = useState(CURRENT_YEAR);
@@ -471,6 +487,8 @@ export default function Analysis() {
   const [sessionType, setSessionType] = useState('R');
   const [availableDrivers, setAvailableDrivers] = useState([]);
   const [selectedDrivers, setSelectedDrivers] = useState([]);
+  const [compareData, setCompareData] = useState({});
+  const [compareLoading, setCompareLoading] = useState(false);
 
   // Data state
   const [lapData, setLapData] = useState([]);
@@ -613,6 +631,36 @@ export default function Analysis() {
     });
   }
 
+  async function handleSessionSelectorChange({ year: selectedYear, event, session }) {
+    setYear(selectedYear);
+    setSelectedEvent(event);
+    setSessionType(SESSION_NAME_TO_CODE[session] || 'R');
+  }
+
+  useEffect(() => {
+    if (!selectedEvent || selectedDrivers.length < 2) {
+      setCompareData({});
+      return;
+    }
+
+    let cancelled = false;
+    setCompareLoading(true);
+    api.compareDrivers(year, selectedEvent, sessionType, selectedDrivers.slice(0, 5))
+      .then((data) => {
+        if (!cancelled) setCompareData(data || {});
+      })
+      .catch(() => {
+        if (!cancelled) setCompareData({});
+      })
+      .finally(() => {
+        if (!cancelled) setCompareLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [year, selectedEvent, sessionType, selectedDrivers]);
+
   const driverColors = selectedDrivers.map((_, i) => ['#e10600', '#00d7b6', '#4781d7', '#f5c623', '#ff8c00'][i] || '#888');
   const isRace = sessionType === 'R' || sessionType === 'SR' || sessionType === 'S';
 
@@ -629,6 +677,31 @@ export default function Analysis() {
           i
         </button>
       </div>
+
+      <div className="card" style={{ marginBottom: '1.25rem' }}>
+        <div className="card-body" style={{ padding: '1.25rem', display: 'grid', gap: '0.85rem' }}>
+          <div className="card-title">Session selector</div>
+          <SessionSelector onChange={handleSessionSelectorChange} />
+        </div>
+      </div>
+
+      {compareLoading && (
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <div className="card-body" style={{ padding: '1rem', color: 'var(--text-secondary)' }}>Loading comparison...</div>
+        </div>
+      )}
+
+      {!compareLoading && Object.keys(compareData).length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <LapDeltaChart driverData={compareData} roster={roster} />
+        </div>
+      )}
+
+      {!compareLoading && Object.keys(compareData).length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <PaceStrip driverData={compareData} roster={roster} />
+        </div>
+      )}
 
       {/* Controls Bar */}
       <div className="card" style={{ marginBottom: '1.25rem' }}>

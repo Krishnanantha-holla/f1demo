@@ -147,6 +147,9 @@ export const api = {
   tiTelemetry:  (year, event, session, driver, lap) => get(`/ti/telemetry/${year}/${encodeURIComponent(event)}/${encodeURIComponent(session)}/${driver}/${lap}`),
   tiWeather:    (year, event, session) => get(`/ti/weather/${year}/${encodeURIComponent(event)}/${encodeURIComponent(session)}`),
 
+  compareDrivers: (year, event, session, drivers) =>
+    get('/compare', { query: { year, event, session_type: session, drivers: drivers.join(',') } }),
+
   // Encyclopedia & News
   news:         () => get('/news'),
   bios:         () => get('/bios'),

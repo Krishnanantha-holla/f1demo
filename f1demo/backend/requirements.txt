@@ -2,11 +2,11 @@ fastapi
 uvicorn[standard]
 fastf1
 httpx
+aiofiles
+filelock
+cachetools
 schedule
-flask
-flask-cors
-requests
 feedparser
-slowapi
-redis
 python-dateutil
+slowapi
+requests

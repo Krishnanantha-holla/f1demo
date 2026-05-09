@@ -44,6 +44,12 @@ echo "Starting backend API on :8000..."
 (cd "${BACKEND_DIR}" && "${UVICORN_BIN}" main:app --host 0.0.0.0 --port 8000) &
 BACKEND_PID=$!
 
+echo "Waiting for backend health..."
+for i in {1..20}; do
+  curl -sf http://localhost:8000/api/health && break
+  sleep 1
+done
+
 echo "Starting automator daemon..."
 (cd "${BACKEND_DIR}" && "${PY_BIN}" automator.py) &
 AUTOMATOR_PID=$!

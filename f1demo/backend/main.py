@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cachetools import TTLCache
 from fastapi import FastAPI, WebSocket, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,7 +18,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import httpx
-import requests as sync_requests
+from filelock import FileLock
 
 from cache_store import cache_backend_name, cache_clear, cache_lookup, cache_write
 from services.free_context import (
@@ -68,52 +69,50 @@ app.add_middleware(
 
 CACHE_TTL = 60  # seconds
 
+# Thread-safe TTL cache — max 512 entries, default TTL 60s
+_cache: TTLCache = TTLCache(maxsize=512, ttl=CACHE_TTL)
+_cache_lock = asyncio.Lock()
+STATE_FILE = Path("./state.json")
+STATE_LOCK = FileLock(str(STATE_FILE) + ".lock")
 
-def cached_get_sync(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
-    """Synchronous GET with cache (memory + optional Redis)."""
-    data, hit = cache_lookup(url, ttl)
-    if hit:
-        return data
-    resp = sync_requests.get(url, timeout=15)
-    if resp.status_code == 404:
-        logger.debug("404 from %s", url)
-        return None
-    resp.raise_for_status()
-    data = resp.json()
-    cache_write(url, data, ttl)
-    return data
+
+def _read_state_file() -> dict:
+    with STATE_LOCK:
+        if STATE_FILE.exists():
+            return json.loads(STATE_FILE.read_text())
+    return {"last_session": None, "last_commit": None, "mode": "idle"}
 
 
 async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
-    """Async GET with cache (memory + optional Redis)."""
-    data, hit = cache_lookup(url, ttl)
-    if hit:
-        return data
+    async with _cache_lock:
+        if url in _cache:
+            return _cache[url]
+
     async with httpx.AsyncClient(timeout=15.0) as client:
         headers = await _openf1_headers()
         resp = await client.get(url, headers=headers)
-        # If token expired, refresh once and retry.
         if resp.status_code == 401 and OPENF1_AUTH_ENABLED:
-            retry_headers = await _openf1_headers(force_refresh=True)
-            resp = await client.get(url, headers=retry_headers)
+            headers = await _openf1_headers(force_refresh=True)
+            resp = await client.get(url, headers=headers)
         if resp.status_code == 404:
             logger.debug("404 from %s", url)
             return None
         if resp.status_code >= 500:
-            logger.warning("Upstream server error %s from %s", resp.status_code, url)
+            logger.warning("Upstream %s from %s", resp.status_code, url)
         resp.raise_for_status()
         data = resp.json()
-    cache_write(url, data, ttl)
+
+    async with _cache_lock:
+        _cache[url] = data
     return data
 
 
 async def safe_cached_get(url: str, default, ttl: int = CACHE_TTL):
-    """Return cached remote data or a safe fallback when upstream is unavailable."""
     try:
         result = await cached_get(url, ttl=ttl)
         return result if result is not None else default
     except Exception as exc:
-        logger.warning("safe_cached_get failed for %s: %s", url, exc)
+        logger.warning("safe_cached_get failed %s: %s", url, exc)
         return default
 
 
@@ -245,18 +244,18 @@ async def health(request: Request):
     except Exception:
         pass
 
-    state_file = Path("./state.json")
-    if state_file.exists():
-        try:
-            st = state_file.stat()
-            age = time.time() - st.st_mtime
-            state = json.loads(state_file.read_text())
-            payload["automator"] = {
-                "mode": state.get("mode"),
-                "state_age_seconds": round(age, 1),
-            }
-        except Exception as exc:
-            payload["automator"] = {"error": str(exc)}
+    try:
+        with STATE_LOCK:
+            if STATE_FILE.exists():
+                st = STATE_FILE.stat()
+                age = time.time() - st.st_mtime
+                state = json.loads(STATE_FILE.read_text())
+                payload["automator"] = {
+                    "mode": state.get("mode"),
+                    "state_age_seconds": round(age, 1),
+                }
+    except Exception as exc:
+        payload["automator"] = {"error": str(exc)}
 
     return payload
 
@@ -506,6 +505,47 @@ def get_telemetry(
         return {"error": str(e)}
 
 
+@app.get("/api/compare")
+def compare_drivers(
+    year: int,
+    event: str,
+    session_type: str,
+    drivers: str = Query(..., description="Comma-separated driver codes, e.g. VER,NOR,HAM"),
+):
+    """
+    Returns lap-by-lap comparison for multiple drivers in a single call.
+    Frontend can plot overlaid lap time charts from this one endpoint.
+    """
+    if not HAS_FASTF1:
+        return {"error": "FastF1 not installed"}
+    driver_list = [d.strip().upper() for d in drivers.split(",") if d.strip()]
+    if not (2 <= len(driver_list) <= 5):
+        return {"error": "Provide 2-5 driver codes"}
+    try:
+        s = fastf1.get_session(year, event, session_type)
+        s.load(telemetry=False, weather=False)
+        result = {}
+        for drv in driver_list:
+            try:
+                laps = s.laps.pick_driver(drv)[
+                    ["LapNumber", "LapTime", "Compound", "IsPersonalBest",
+                     "Sector1Time", "Sector2Time", "Sector3Time", "Stint"]
+                ].dropna(subset=["LapTime"])
+                laps = laps.copy()
+                laps["LapTimeSeconds"] = laps["LapTime"].dt.total_seconds()
+                laps["S1"] = laps["Sector1Time"].dt.total_seconds()
+                laps["S2"] = laps["Sector2Time"].dt.total_seconds()
+                laps["S3"] = laps["Sector3Time"].dt.total_seconds()
+                result[drv] = laps[["LapNumber", "LapTimeSeconds", "Compound",
+                                     "IsPersonalBest", "S1", "S2", "S3", "Stint"]].to_dict(orient="records")
+            except Exception as exc:
+                result[drv] = {"error": str(exc)}
+        return result
+    except Exception as exc:
+        logger.error("compare error: %s", exc)
+        return {"error": str(exc)}
+
+
 # ══════════════════════════════════════════
 # OPENF1 LIVE PROXY
 # ══════════════════════════════════════════
@@ -681,9 +721,10 @@ async def session_mode():
     except Exception:
         pass
 
-    state_file = Path("./state.json")
-    if state_file.exists():
-        return json.loads(state_file.read_text())
+    try:
+        return _read_state_file()
+    except Exception:
+        pass
     return {"mode": "idle", "ts": datetime.now().isoformat()}
 
 

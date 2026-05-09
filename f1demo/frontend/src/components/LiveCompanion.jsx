@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { useLiveSession } from '../hooks/useLiveSession';
-import { api, getTeamColor } from '../api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getTeamColor } from '../api';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { useF1Store } from '../store/useF1Store';
 
 const FLAG_COLORS = {
   RED: '#e10600',
@@ -18,29 +19,38 @@ function WeatherIcon({ rainfall, airTemp }) {
 }
 
 export default function LiveCompanion() {
-  const { sessionMode, liveData, isLive } = useLiveSession();
+  const sessionMode = useF1Store((state) => state.sessionMode);
+  const sessionInfo = useF1Store((state) => state.sessionInfo);
+  const driverRoster = useF1Store((state) => state.driverRoster);
   const [minimized, setMinimized] = useState(false);
-  const [driverMap, setDriverMap] = useState({});
+  const [liveData, setLiveData] = useState(null);
   const [countdown, setCountdown] = useState('');
   const [activeAlert, setActiveAlert] = useState(null);
   const alertTimer = useRef(null);
   const prevRCRef = useRef('');
 
-  // Load driver names once
-  useEffect(() => {
-    if (!isLive) return;
-    api.drivers().then(drivers => {
-      const map = {};
-      drivers.forEach(d => { map[d.driver_number] = d; });
-      setDriverMap(map);
-    }).catch(() => {});
-  }, [isLive]);
+  const isLive = sessionMode === 'live';
+
+  const handleMessage = useCallback((data) => {
+    if (data?.error) return;
+    setLiveData(data);
+  }, []);
+
+  useWebSocket({ onMessage: handleMessage, enabled: isLive });
+
+  const driverMap = useMemo(() => {
+    const map = {};
+    driverRoster.forEach((driver) => {
+      map[driver.driver_number] = driver;
+    });
+    return map;
+  }, [driverRoster]);
 
   // Live countdown in tab title
   useEffect(() => {
-    if (!isLive || !sessionMode.session?.date_end) return;
+    if (!isLive || !sessionInfo?.date_end) return;
     const tick = () => {
-      const remaining = Math.max(0, new Date(sessionMode.session.date_end) - Date.now());
+      const remaining = Math.max(0, new Date(sessionInfo.date_end) - Date.now());
       const h = Math.floor(remaining / 3600000);
       const m = Math.floor((remaining % 3600000) / 60000);
       const s = Math.floor((remaining % 60000) / 1000);
@@ -49,17 +59,17 @@ export default function LiveCompanion() {
         : `${m}:${String(s).padStart(2,'0')}`;
       setCountdown(label);
       document.title = remaining > 0
-        ? `🔴 ${label} · ${sessionMode.session.session_name}`
-        : `🏁 ${sessionMode.session.session_name} · F1`;
+        ? `🔴 ${label} · ${sessionInfo.session_name}`
+        : `🏁 ${sessionInfo.session_name} · F1`;
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => { clearInterval(id); document.title = 'F1 Dashboard'; };
-  }, [isLive, sessionMode]);
+  }, [isLive, sessionInfo]);
 
   // Show race control alerts as banners
   useEffect(() => {
-    const rc = liveData?.raceControl;
+    const rc = liveData?.race_control || liveData?.raceControl;
     if (!rc?.length) return;
     const latest = rc[rc.length - 1];
     if (!latest || latest.message === prevRCRef.current) return;
@@ -73,13 +83,13 @@ export default function LiveCompanion() {
     setActiveAlert(latest);
     clearTimeout(alertTimer.current);
     alertTimer.current = setTimeout(() => setActiveAlert(null), 12000);
-  }, [liveData?.raceControl]);
+  }, [liveData]);
 
-  if (!isLive) return null;
+  if (!isLive && !liveData) return null;
 
   // Build sorted position list with driver info
   const posMap = {};
-  (liveData?.positions || []).forEach(p => {
+  (liveData?.positions || []).forEach((p) => {
     if (!posMap[p.driver_number] || new Date(p.date) > new Date(posMap[p.driver_number].date)) {
       posMap[p.driver_number] = p;
     }
@@ -88,10 +98,10 @@ export default function LiveCompanion() {
 
   // Interval gaps
   const intervalMap = {};
-  (liveData?.intervals || []).forEach(iv => { intervalMap[iv.driver_number] = iv; });
+  (liveData?.intervals || []).forEach((iv) => { intervalMap[iv.driver_number] = iv; });
 
   const weather = liveData?.weather;
-  const sessionName = sessionMode.session?.session_name || 'LIVE';
+  const sessionName = sessionInfo?.session_name || 'LIVE';
   const alertColor = FLAG_COLORS[activeAlert?.flag] || FLAG_COLORS[activeAlert?.category] || '#ffd700';
 
   return (

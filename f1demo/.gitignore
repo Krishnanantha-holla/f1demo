@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+backend/cache/
+backend/state.json
+backend/public/session_mode.json
+*.log

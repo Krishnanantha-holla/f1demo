@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';
+import SessionSelector from '../components/SessionSelector';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 2017 }, (_, i) => CURRENT_YEAR - i);
@@ -950,6 +951,13 @@ export default function Telemetry() {
     return d?.tc ? `#${d.tc}` : DEFAULT_COLORS[selectedDrivers.indexOf(code) % DEFAULT_COLORS.length];
   };
 
+  const handleSessionSelectorChange = ({ year: selectedYear, event: selectedEvent, session: selectedSession }) => {
+    setYear(selectedYear);
+    setEvent(selectedEvent);
+    setSession(selectedSession);
+    setSessionChosenByUser(true);
+  };
+
   const orderedLaptimeData = selectedDrivers.map(c => laptimeData[c]).filter(Boolean);
   const orderedColors = selectedDrivers.map(c => getColor(c));
   const sessionShort = SESSION_MAP[session] || session;
@@ -965,6 +973,13 @@ export default function Telemetry() {
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1 className="page-title">Telemetry Analysis</h1>
           <span className="season-badge">{year}</span>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.25rem' }}>
+        <div className="card-body" style={{ padding: '1.25rem', display: 'grid', gap: '0.85rem' }}>
+          <div className="card-title">Session selector</div>
+          <SessionSelector onChange={handleSessionSelectorChange} />
         </div>
       </div>
 

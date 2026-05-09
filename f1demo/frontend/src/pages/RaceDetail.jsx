@@ -3,6 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import { getCircuitData } from '../circuitData';
 import { Loading, ErrorMsg, formatDateFull } from '../components/Shared';
+import WeatherStrip from '../components/WeatherStrip';
+import TeamRadio from '../components/TeamRadio';
+import GapChart from '../components/GapChart';
 
 // ── Helpers ──
 function fmtLap(secs) {
@@ -612,6 +615,7 @@ export default function RaceDetail() {
   const [driverMap, setDriverMap] = useState({});
   const [mapData, setMapData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
+  const [intervalData, setIntervalData] = useState([]);
   const [status, setStatus] = useState('loading');
   const [selectedResult, setSelectedResult] = useState(null);
   const [allLapData, setAllLapData] = useState({});
@@ -651,13 +655,14 @@ export default function RaceDetail() {
 
         if (race) {
           // 2. Get all race data in parallel
-          const [resultData, gridDataRaw, overtakes, laps, stints, weatherRaw] = await Promise.all([
+          const [resultData, gridDataRaw, overtakes, laps, stints, weatherRaw, intervalsRaw] = await Promise.all([
             api.sessionResult(race.session_key).catch(() => []),
             api.startingGrid(race.session_key).catch(() => []),
             api.overtakes(race.session_key).catch(() => []),
             api.laps(race.session_key).catch(() => []),
             api.stints(race.session_key).catch(() => []),
             api.weather(race.session_key).catch(() => []),
+            api.intervals(race.session_key).catch(() => []),
           ]);
 
           // Get the latest weather reading
@@ -690,6 +695,7 @@ export default function RaceDetail() {
 
           setOvertakeData(Array.isArray(overtakes) ? overtakes : []);
           setStintData(Array.isArray(stints) ? stints : []);
+          setIntervalData(Array.isArray(intervalsRaw) ? intervalsRaw : []);
 
           // Group laps by driver for chart (top 5 finishers) + all laps for modal
           const top5 = sortedResults.slice(0, 5).map(r => r.driver_number);
@@ -751,6 +757,12 @@ export default function RaceDetail() {
       <div className="race-detail-header">
         <div>
           <h1 className="page-title">{meeting?.meeting_name || 'Race'}</h1>
+        {intervalData.length > 0 && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <GapChart intervalsData={intervalData} roster={Object.values(driverMap)} />
+          </div>
+        )}
+
           <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
             {meeting?.circuit_short_name} — {meeting?.location}, {meeting?.country_name}
           </div>
@@ -764,6 +776,12 @@ export default function RaceDetail() {
           <div className="season-badge">{raceSession.session_name}</div>
         )}
       </div>
+
+      {raceSession && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <WeatherStrip sessionKey={raceSession.session_key} />
+        </div>
+      )}
 
       {/* Top section: Track Map (large) + Circuit Info sidebar */}
       <div className="race-detail-top">
@@ -802,6 +820,12 @@ export default function RaceDetail() {
           <div className="card-body" style={{ padding: '1.5rem' }}>
             <Podium results={results} driverMap={driverMap} />
           </div>
+        </div>
+      )}
+
+      {raceSession && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <TeamRadio sessionKey={raceSession.session_key} roster={Object.values(driverMap)} isLive={false} />
         </div>
       )}
 

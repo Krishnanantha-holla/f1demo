@@ -4,11 +4,13 @@ for new data commits, handles season rollover. Zero manual intervention.
 """
 import json
 import time
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 import schedule
+from filelock import FileLock
 
 try:
     import fastf1
@@ -19,16 +21,24 @@ except ImportError:
 
 CURRENT_YEAR = datetime.now().year
 STATE_FILE = Path('./state.json')
+STATE_LOCK = FileLock(str(STATE_FILE) + '.lock')
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GH_HEADERS = {
+    "Accept": "application/vnd.github.v3+json",
+    **({"Authorization": f"Bearer {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}),
+}
 
 
 def get_state():
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+    with STATE_LOCK:
+        if STATE_FILE.exists():
+            return json.loads(STATE_FILE.read_text())
     return {"last_session": None, "last_commit": None, "mode": "idle"}
 
 
 def save_state(state):
-    STATE_FILE.write_text(json.dumps(state, default=str))
+    with STATE_LOCK:
+        STATE_FILE.write_text(json.dumps(state, default=str))
 
 
 def detect_live_session():
@@ -58,7 +68,7 @@ def check_tracinginsights():
     try:
         r = requests.get(
             f"https://api.github.com/repos/TracingInsights/{year}/commits?per_page=1",
-            headers={"Accept": "application/vnd.github.v3+json"},
+            headers=GH_HEADERS,
             timeout=10,
         )
         if r.status_code == 200 and r.json():
