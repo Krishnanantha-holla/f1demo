@@ -6,6 +6,12 @@ export function useWebSocket({ onMessage, enabled = true }) {
   const ws = useRef(null);
   const retryTimer = useRef(null);
   const retryCount = useRef(0);
+  const onMessageRef = useRef(onMessage);
+
+  // Keep ref updated without causing reconnects
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   const connect = useCallback(() => {
     if (!enabled) return;
@@ -20,7 +26,7 @@ export function useWebSocket({ onMessage, enabled = true }) {
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          onMessage?.(data);
+          onMessageRef.current?.(data);
         } catch {
           // Ignore malformed messages.
         }
@@ -38,7 +44,7 @@ export function useWebSocket({ onMessage, enabled = true }) {
     } catch {
       // Connection setup failed; retry through the close path.
     }
-  }, [enabled, onMessage]);
+  }, [enabled]);
 
   useEffect(() => {
     connect();

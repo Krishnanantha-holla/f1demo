@@ -1,19 +1,28 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 export function useNotifications() {
   const permissionGranted = useRef(false);
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        permissionGranted.current = permission === 'granted';
-      });
-    } else if (Notification.permission === 'granted') {
+    if ('Notification' in window && Notification.permission === 'granted') {
       permissionGranted.current = true;
     }
   }, []);
 
-  const notify = (title, options = {}) => {
+  const requestPermission = useCallback(async () => {
+    if (!('Notification' in window)) return false;
+
+    try {
+      const permission = await Notification.requestPermission();
+      permissionGranted.current = permission === 'granted';
+      return permissionGranted.current;
+    } catch (err) {
+      console.warn('[Notifications] Failed to request permission:', err);
+      return false;
+    }
+  }, []);
+
+  const notify = useCallback((title, options = {}) => {
     if (!permissionGranted.current || !('Notification' in window)) return;
     
     try {
@@ -30,7 +39,7 @@ export function useNotifications() {
     } catch (err) {
       console.warn('[Notifications] Failed to show notification:', err);
     }
-  };
+  }, []);
 
-  return { notify, permissionGranted: permissionGranted.current };
+  return { notify, requestPermission, permissionGranted: permissionGranted.current };
 }

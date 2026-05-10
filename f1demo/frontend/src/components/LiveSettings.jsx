@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNotifications } from '../hooks/useNotifications';
 
 export default function LiveSettings() {
+  const { requestPermission } = useNotifications();
   const [settings, setSettings] = useState({
     notifications: true,
     sound: true,
@@ -8,6 +10,9 @@ export default function LiveSettings() {
     raceControlAlerts: true,
     autoMinimize: false,
   });
+  const [notificationPermission, setNotificationPermission] = useState(() => (
+    'Notification' in window ? Notification.permission : 'unsupported'
+  ));
 
   useEffect(() => {
     const saved = localStorage.getItem('liveSettings');
@@ -24,6 +29,14 @@ export default function LiveSettings() {
     localStorage.setItem('liveSettings', JSON.stringify(newSettings));
   };
 
+  const handleEnableNotifications = async () => {
+    const granted = await requestPermission();
+    setNotificationPermission('Notification' in window ? Notification.permission : 'unsupported');
+    if (granted) {
+      updateSetting('notifications', true);
+    }
+  };
+
   return (
     <div className="live-settings">
       <h4>Live Companion Settings</h4>
@@ -36,6 +49,9 @@ export default function LiveSettings() {
           />
           <span>Desktop Notifications</span>
         </label>
+        <button type="button" className="setting-action" onClick={handleEnableNotifications}>
+          {notificationPermission === 'granted' ? 'Notifications enabled' : 'Enable desktop notifications'}
+        </button>
         <label className="setting-item">
           <input
             type="checkbox"

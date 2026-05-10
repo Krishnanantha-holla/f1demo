@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cachetools import TTLCache
-from fastapi import FastAPI, WebSocket, Query, Request
+from fastapi import FastAPI, WebSocket, Query, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -56,6 +56,9 @@ ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()] or [
     "http://localhost:4173",
     "http://127.0.0.1:5173",
 ]
+
+# ── Internal API secret for authenticating internal-only endpoints ──
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "changeme-in-production")
 
 app = FastAPI(title="F1 Dashboard API", version="2.0")
 app.state.limiter = limiter
@@ -324,26 +327,35 @@ def season():
 
 
 @app.get("/api/schedule")
-def schedule(year: int = None):
+async def schedule(year: int = None):
     yr = year or current_year()
     if not HAS_FASTF1:
-        return {"error": "FastF1 not installed"}
-    s = fastf1.get_event_schedule(yr, include_testing=False)
-    records = s.to_dict(orient="records")
-    # Serialize Timestamp objects
-    for r in records:
-        for k, v in r.items():
-            if hasattr(v, "isoformat"):
-                r[k] = v.isoformat()
-    return records
+        raise HTTPException(status_code=503, detail="FastF1 not installed")
+    
+    def _get_schedule():
+        s = fastf1.get_event_schedule(yr, include_testing=False)
+        records = s.to_dict(orient="records")
+        # Serialize Timestamp objects
+        for r in records:
+            for k, v in r.items():
+                if hasattr(v, "isoformat"):
+                    r[k] = v.isoformat()
+        return records
+    
+    try:
+        return await asyncio.to_thread(_get_schedule)
+    except Exception as e:
+        logger.error("schedule error year=%s: %s", yr, e)
+        raise HTTPException(status_code=500, detail="Failed to fetch schedule")
 
 
 @app.get("/api/next-race")
-def next_race():
+async def next_race():
     if not HAS_FASTF1:
-        return {}
-    yr = current_year()
-    try:
+        raise HTTPException(status_code=503, detail="FastF1 not installed")
+    
+    def _get_next_race():
+        yr = current_year()
         s = fastf1.get_event_schedule(yr, include_testing=False)
         now = datetime.now(timezone.utc)
         # EventDate may be a Timestamp — compare safely
@@ -355,8 +367,12 @@ def next_race():
             if hasattr(v, "isoformat"):
                 row[k] = v.isoformat()
         return row
-    except Exception:
-        return {}
+    
+    try:
+        return await asyncio.to_thread(_get_next_race)
+    except Exception as e:
+        logger.error("next_race error: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch next race")
 
 
 # ══════════════════════════════════════════
@@ -413,8 +429,14 @@ async def race_results(year: int, round_num: int):
 
 
 @app.get("/api/free/context")
-def free_context(year: int = None):
-    return _build_free_context(year)
+async def free_context(year: int = None):
+    def _get_context():
+        return _build_free_context(year)
+    try:
+        return await asyncio.to_thread(_get_context)
+    except Exception as e:
+        logger.error("free_context error: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch context")
 
 
 @app.get("/api/free/roster")
@@ -481,7 +503,7 @@ async def free_roster(year: int = None):
 # LAP TIMES (FastF1)
 # ══════════════════════════════════════════
 @app.get("/api/laps/{year}/{event}/{session_type}")
-def get_laps(
+async def get_laps(
     request: Request,
     year: int,
     event: str,
@@ -490,12 +512,13 @@ def get_laps(
     page_size: int = Query(500, ge=1, le=2000),
 ):
     if not HAS_FASTF1:
-        return {"error": "FastF1 not installed"}
+        raise HTTPException(status_code=503, detail="FastF1 not installed")
     if year < 2018 or year > 2030:
-        return {"error": "year must be between 2018 and 2030"}
+        raise HTTPException(status_code=400, detail="year must be between 2018 and 2030")
     if session_type not in ("R", "Q", "FP1", "FP2", "FP3", "SQ", "SR", "S"):
-        return {"error": "invalid session_type"}
-    try:
+        raise HTTPException(status_code=400, detail="invalid session_type")
+    
+    def _get_laps():
         s = fastf1.get_session(year, event, session_type)
         s.load(telemetry=False, weather=False)
         laps = s.laps[
@@ -521,16 +544,19 @@ def get_laps(
             "page_size": page_size,
             "pages": max(1, (total + page_size - 1) // page_size),
         }
+    
+    try:
+        return await asyncio.to_thread(_get_laps)
     except Exception as e:
         logger.error("get_laps error year=%s event=%s session=%s: %s", year, event, session_type, e)
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail="Failed to fetch laps")
 
 
 # ══════════════════════════════════════════
 # TELEMETRY (FastF1)
 # ══════════════════════════════════════════
 @app.get("/api/telemetry/{year}/{event}/{session_type}/{driver}")
-def get_telemetry(
+async def get_telemetry(
     request: Request,
     year: int,
     event: str,
@@ -538,14 +564,15 @@ def get_telemetry(
     driver: str,
 ):
     if not HAS_FASTF1:
-        return {"error": "FastF1 not installed"}
+        raise HTTPException(status_code=503, detail="FastF1 not installed")
     if year < 2018 or year > 2030:
-        return {"error": "year must be between 2018 and 2030"}
+        raise HTTPException(status_code=400, detail="year must be between 2018 and 2030")
     if session_type not in ("R", "Q", "FP1", "FP2", "FP3", "SQ", "SR", "S"):
-        return {"error": "invalid session_type"}
+        raise HTTPException(status_code=400, detail="invalid session_type")
     if not driver.isalpha() or not (2 <= len(driver) <= 4):
-        return {"error": "driver must be a 2-4 letter code"}
-    try:
+        raise HTTPException(status_code=400, detail="driver must be a 2-4 letter code")
+    
+    def _get_telemetry():
         s = fastf1.get_session(year, event, session_type)
         s.load()
         fastest = s.laps.pick_driver(driver).pick_fastest()
@@ -555,13 +582,16 @@ def get_telemetry(
         # Sample every 5 rows to reduce payload
         sampled = tel.iloc[::5]
         return sampled.to_dict(orient="records")
+    
+    try:
+        return await asyncio.to_thread(_get_telemetry)
     except Exception as e:
         logger.error("get_telemetry error year=%s event=%s session=%s driver=%s: %s", year, event, session_type, driver, e)
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail="Failed to fetch telemetry")
 
 
 @app.get("/api/compare")
-def compare_drivers(
+async def compare_drivers(
     year: int,
     event: str,
     session_type: str,
@@ -572,11 +602,12 @@ def compare_drivers(
     Frontend can plot overlaid lap time charts from this one endpoint.
     """
     if not HAS_FASTF1:
-        return {"error": "FastF1 not installed"}
+        raise HTTPException(status_code=503, detail="FastF1 not installed")
     driver_list = [d.strip().upper() for d in drivers.split(",") if d.strip()]
     if not (2 <= len(driver_list) <= 5):
-        return {"error": "Provide 2-5 driver codes"}
-    try:
+        raise HTTPException(status_code=400, detail="Provide 2-5 driver codes")
+    
+    def _compare():
         s = fastf1.get_session(year, event, session_type)
         s.load(telemetry=False, weather=False)
         result = {}
@@ -594,11 +625,15 @@ def compare_drivers(
                 result[drv] = laps[["LapNumber", "LapTimeSeconds", "Compound",
                                      "IsPersonalBest", "S1", "S2", "S3", "Stint"]].to_dict(orient="records")
             except Exception as exc:
-                result[drv] = {"error": str(exc)}
+                logger.error("compare driver %s error: %s", drv, exc)
+                result[drv] = []
         return result
+    
+    try:
+        return await asyncio.to_thread(_compare)
     except Exception as exc:
         logger.error("compare error: %s", exc)
-        return {"error": str(exc)}
+        raise HTTPException(status_code=500, detail="Failed to compare drivers")
 
 
 # ══════════════════════════════════════════
@@ -800,8 +835,14 @@ async def session_mode():
 # ══════════════════════════════════════════
 # INTERNAL: Cache Refresh (called by automator)
 # ══════════════════════════════════════════
+# INTERNAL: Cache Refresh (called by automator)
+# ══════════════════════════════════════════
 @app.post("/internal/refresh-cache")
-def refresh_cache():
+def refresh_cache(request: Request):
+    """Clears all caches. Requires X-Internal-Secret header."""
+    secret = request.headers.get("X-Internal-Secret")
+    if secret != INTERNAL_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid internal secret")
     cache_clear()
     return {"status": "cache_cleared"}
 

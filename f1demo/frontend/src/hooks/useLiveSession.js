@@ -60,7 +60,7 @@ export function useLiveSession() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [notify]);
+  }, []);
 
   // Poll live data only when session is active
   useEffect(() => {
@@ -116,7 +116,7 @@ export function useLiveSession() {
     fetchLiveData();
     const id = setInterval(fetchLiveData, 8000); // 8s — respectful of rate limits
     return () => { cancelled = true; clearInterval(id); };
-  }, [sessionMode, notify]);
+  }, [sessionMode]);
 
   return { sessionMode, liveData, isLive: sessionMode.mode === 'live' };
 }
