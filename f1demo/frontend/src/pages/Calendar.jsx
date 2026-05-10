@@ -201,13 +201,19 @@ function RaceModal({ meeting, sessions, podium, driverMap, mapData, onClose }) {
           </div>
 
           {/* Link to full race page */}
-          <Link
-            to={`/race/${meeting.meeting_key}`}
-            className="cal-results-btn"
-            style={{ display: 'block', textAlign: 'center', marginTop: '0.5rem' }}
-          >
-            {past && podium.length > 0 ? 'View Full Results →' : 'View Race Details →'}
-          </Link>
+          {meeting.source !== 'fastf1' ? (
+            <Link
+              to={`/race/${meeting.meeting_key}`}
+              className="cal-results-btn"
+              style={{ display: 'block', textAlign: 'center', marginTop: '0.5rem' }}
+            >
+              {past && podium.length > 0 ? 'View Full Results →' : 'View Race Details →'}
+            </Link>
+          ) : (
+            <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              OpenF1 race details unavailable for this entry.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -430,7 +436,7 @@ export default function Calendar() {
                       </div>
                     )}
 
-                    <div className="click-hint">Click for details →</div>
+                    <div className="click-hint">{m.source === 'fastf1' ? 'Schedule only' : 'Click for details →'}</div>
                   </div>
                 </div>
               );

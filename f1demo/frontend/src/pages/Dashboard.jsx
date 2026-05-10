@@ -301,7 +301,7 @@ function LiveSession({ drivers, modeMeta, freeContext }) {
                 : 'Session watch'}
           </span>
           {activeInProgress && (
-            <span className="dashboard-pill dashboard-pill-live">In Progress{activeElapsed ? ` • ${activeElapsed}` : ''}</span>
+            <span className="dashboard-pill dashboard-pill-live">In Progress{elapsed ? ` • ${elapsed}` : ''}</span>
           )}
         </div>
       </div>

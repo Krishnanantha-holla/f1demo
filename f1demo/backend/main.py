@@ -133,6 +133,61 @@ def _ensure_utc(dt_value):
     return svc_ensure_utc(dt_value)
 
 
+def _fastf1_schedule_records(year: int) -> list[dict]:
+    if not HAS_FASTF1:
+        return []
+    try:
+        schedule = fastf1.get_event_schedule(year, include_testing=False)
+    except Exception:
+        return []
+
+    records = []
+    for index, (_, row) in enumerate(schedule.iterrows(), start=1):
+        data = row.to_dict()
+        round_num = int(data.get("RoundNumber") or index)
+        start = data.get("EventDate")
+        end = start
+        for session_index in range(5, 0, -1):
+            candidate = data.get(f"Session{session_index}DateUtc")
+            if candidate is not None:
+                end = candidate
+                break
+        records.append({
+            "meeting_key": round_num,
+            "year": year,
+            "meeting_name": data.get("EventName") or data.get("OfficialEventName") or f"Round {round_num}",
+            "location": data.get("Location") or data.get("Country") or "",
+            "country_name": data.get("Country") or data.get("CountryName") or "",
+            "circuit_short_name": data.get("CircuitShortName") or data.get("Location") or data.get("EventName") or "",
+            "circuit_key": data.get("CircuitKey"),
+            "date_start": start.isoformat() if hasattr(start, "isoformat") else None,
+            "date_end": end.isoformat() if hasattr(end, "isoformat") else None,
+            "source": "fastf1",
+            "_schedule_row": data,
+        })
+    return records
+
+
+def _fastf1_sessions_for_round(year: int, meeting_key: int) -> list[dict]:
+    schedule_records = _fastf1_schedule_records(year)
+    match = next((row for row in schedule_records if int(row.get("meeting_key") or -1) == int(meeting_key)), None)
+    if not match:
+        return []
+
+    row = match["_schedule_row"]
+    windows = svc_event_session_windows(row)
+    sessions = []
+    for index, window in enumerate(windows, start=1):
+        sessions.append({
+            "session_key": int(meeting_key) * 10 + index,
+            "session_name": window["name"],
+            "date_start": window["start"].isoformat(),
+            "date_end": window["end"].isoformat(),
+            "source": "fastf1",
+        })
+    return sessions
+
+
 # ══════════════════════════════════════════
 # OPENF1 API BASE
 # ══════════════════════════════════════════
@@ -569,7 +624,13 @@ async def drivers(session_key: str = "latest"):
 @app.get("/api/meetings")
 async def meetings(year: int = None):
     yr = year or current_year()
-    return await safe_cached_get(f"{OPENF1}/meetings?year={yr}", [], ttl=300)
+    data = await safe_cached_get(f"{OPENF1}/meetings?year={yr}", [], ttl=300)
+    if data:
+        for item in data:
+            if isinstance(item, dict):
+                item["source"] = item.get("source") or "openf1"
+        return data
+    return _fastf1_schedule_records(yr)
 
 
 @app.get("/api/sessions")
@@ -579,7 +640,15 @@ async def sessions(session_key: str = "latest"):
 
 @app.get("/api/sessions/meeting/{meeting_key}")
 async def sessions_for_meeting(meeting_key: int):
-    return await safe_cached_get(f"{OPENF1}/sessions?meeting_key={meeting_key}", [], ttl=300)
+    data = await safe_cached_get(f"{OPENF1}/sessions?meeting_key={meeting_key}", [], ttl=300)
+    if data:
+        for item in data:
+            if isinstance(item, dict):
+                item["source"] = item.get("source") or "openf1"
+        return data
+
+    yr = current_year()
+    return _fastf1_sessions_for_round(yr, meeting_key)
 
 
 @app.get("/api/positions")
