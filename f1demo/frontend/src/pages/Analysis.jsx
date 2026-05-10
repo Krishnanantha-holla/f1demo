@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, getTeamColor } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';
@@ -7,8 +7,9 @@ import LapDeltaChart from '../components/LapDeltaChart';
 import PaceStrip from '../components/PaceStrip';
 import { useF1Store } from '../store/useF1Store';
 
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2017 }, (_, i) => CURRENT_YEAR - i);
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
 const SESSION_TYPES = ['R', 'Q', 'FP1', 'FP2', 'FP3', 'SQ', 'SR', 'S'];
 const COMPOUND_COLORS = {
   SOFT: '#e10600', MEDIUM: '#f5c623', HARD: '#e8e8ee',
@@ -480,8 +481,14 @@ export default function Analysis() {
   const [searchParams] = useSearchParams();
   const roster = useF1Store((state) => state.driverRoster);
 
+  const currentYear = useMemo(() => getCurrentYear(), []);
+  const years = useMemo(() => 
+    Array.from({ length: currentYear - 2017 }, (_, i) => currentYear - i),
+    [currentYear]
+  );
+
   // Controls state
-  const [year, setYear] = useState(CURRENT_YEAR);
+  const [year, setYear] = useState(currentYear);
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState('');
   const [sessionType, setSessionType] = useState('R');
@@ -710,7 +717,7 @@ export default function Analysis() {
             <div className="telem-select-group">
               <label>Year</label>
               <select value={year} onChange={e => setYear(Number(e.target.value))}>
-                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
             <div className="telem-select-group">

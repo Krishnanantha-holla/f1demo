@@ -1,0 +1,36 @@
+/**
+ * F1 Dashboard — Modularized CSS Entry Point
+ * Organized for maintainability and component-scoped styling
+ * 
+ * Future refactoring: Extract sections from styles.css into:
+ * - base.css: Variables, animations, typography, resets
+ * - layout.css: Sidebar, main wrapper, grid system, flexbox
+ * - cards.css: Glassmorphism cards, data tables, panels
+ * - dashboard.css: Dashboard calendar, next race, podium
+ * - drivers.css: Driver/constructor grids, car images
+ * - race-detail.css: Race detail layouts, analysis, modals
+ * - telemetry.css: Trace charts, analysis views
+ * - live.css: Live companion widget, team radio
+ * - keyboard.css: Keyboard shortcuts overlay
+ * - utils.css: Loading states, error displays, interactions
+ * - responsive.css: Mobile-first breakpoints
+ */
+
+/* For now, import the consolidated styles.css with all existing styles */
+@import '../styles.css';
+
+/* 
+ * CSS Modularization Strategy:
+ * 1. Keep styles.css as-is (fully backward compatible)
+ * 2. As components are updated, extract their styles to scoped modules above
+ * 3. Delete from styles.css once extracted
+ * 4. Use CSS modules or scoped classes per component
+ * 5. Gradually transition to component-scoped styling
+ * 
+ * Benefits:
+ * - Easier debugging (find component style in component directory)
+ * - Reduces CSS bundle size over time (only load needed styles)
+ * - Better maintenance (related HTML/CSS/JS in same location)
+ * - Foundation for CSS-in-JS tooling integration
+ */
+

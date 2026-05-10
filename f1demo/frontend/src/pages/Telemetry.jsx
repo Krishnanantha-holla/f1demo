@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { api } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';
 import SessionSelector from '../components/SessionSelector';
 
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2017 }, (_, i) => CURRENT_YEAR - i);
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
 const SESSION_MAP = { 'Practice 1': 'FP1', 'Practice 2': 'FP2', 'Practice 3': 'FP3', 'Qualifying': 'Q', 'Race': 'R', 'Sprint': 'S', 'Sprint Qualifying': 'SQ', 'Sprint Shootout': 'SS' };
 
 const COMPOUND_COLORS = { SOFT: '#e10600', MEDIUM: '#f5c623', HARD: '#eee', INTERMEDIATE: '#45b649', WET: '#2d6dd1', UNKNOWN: '#888' };
@@ -799,7 +800,13 @@ function TelemetrySkeletonPanels() {
 
 // ── Main Telemetry Page ──
 export default function Telemetry() {
-  const [year, setYear] = useState(CURRENT_YEAR);
+  const currentYear = useMemo(() => getCurrentYear(), []);
+  const years = useMemo(() => 
+    Array.from({ length: currentYear - 2017 }, (_, i) => currentYear - i),
+    [currentYear]
+  );
+  
+  const [year, setYear] = useState(currentYear);
   const [events, setEvents] = useState([]);
   const [event, setEvent] = useState('');
   const [sessions, setSessions] = useState([]);
@@ -988,7 +995,7 @@ export default function Telemetry() {
         <div className="telem-select-group">
           <label>Year</label>
           <select value={year} onChange={e => setYear(Number(e.target.value))}>
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div className="telem-select-group">
