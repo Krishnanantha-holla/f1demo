@@ -1,13 +1,14 @@
 """Miscellaneous endpoints: news, bios, internal cache, circuit maps."""
 import json
-import re
 from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException
 from services.news_service import fetch_news
 from cache_store import cache_lookup, cache_write
-from utils import logger, INTERNAL_SECRET, cached_get, cache_clear
+from utils import logger, INTERNAL_SECRET, cached_get, cache_clear, _validate_ti_param
 
 router = APIRouter()
+internal_router = APIRouter()
+
 
 
 @router.get("/news")
@@ -25,7 +26,7 @@ def get_bios():
     return {"drivers": {}, "constructors": {}}
 
 
-@router.post("/internal/refresh-cache")
+@internal_router.post("/internal/refresh-cache")
 def refresh_cache(request: Request):
     """Clear all caches. Requires X-Internal-Secret header."""
     secret = request.headers.get("X-Internal-Secret")
@@ -33,14 +34,6 @@ def refresh_cache(request: Request):
         raise HTTPException(status_code=403, detail="Invalid internal secret")
     cache_clear()
     return {"status": "cache_cleared"}
-
-
-def _validate_ti_param(value: str, param_name: str, max_length: int = 100):
-    """Validate TracingInsights path parameters to prevent injection attacks."""
-    if not value or len(value) > max_length:
-        raise HTTPException(status_code=400, detail=f"Invalid {param_name}: length constraint")
-    if not re.match(r'^[a-zA-Z0-9\s\-_()]+$', value):
-        raise HTTPException(status_code=400, detail=f"Invalid {param_name}: invalid characters")
 
 
 @router.get("/circuit-map/{circuit_key}")

@@ -1,19 +1,10 @@
 """TracingInsights data proxy endpoints."""
-import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
-from utils import logger, cached_get, TI_RAW, TI_API
+from utils import logger, cached_get, TI_RAW, TI_API, _validate_ti_param
 
 router = APIRouter()
-
-
-def _validate_ti_param(value: str, param_name: str, max_length: int = 100):
-    """Validate TracingInsights path parameters to prevent injection attacks."""
-    if not value or len(value) > max_length:
-        raise HTTPException(status_code=400, detail=f"Invalid {param_name}: length constraint")
-    if not re.match(r'^[a-zA-Z0-9\s\-_()]+$', value):
-        raise HTTPException(status_code=400, detail=f"Invalid {param_name}: invalid characters")
 
 
 @router.get("/ti/events/{year}")

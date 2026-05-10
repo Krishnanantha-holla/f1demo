@@ -10,6 +10,8 @@ from pathlib import Path
 from cachetools import TTLCache
 import httpx
 from filelock import FileLock
+from fastapi import HTTPException
+import re
 
 from cache_store import cache_backend_name, cache_clear, cache_lookup, cache_write
 from services.free_context import (
@@ -29,6 +31,7 @@ try:
     fastf1.Cache.enable_cache('./cache')
     HAS_FASTF1 = True
 except ImportError:
+     fastf1 = None
     HAS_FASTF1 = False
     logger.warning("fastf1 not installed — historical data endpoints will be unavailable")
 
@@ -51,6 +54,9 @@ OPENF1_USERNAME = os.getenv("OPENF1_USERNAME")
 OPENF1_PASSWORD = os.getenv("OPENF1_PASSWORD")
 OPENF1_ACCESS_TOKEN = os.getenv("OPENF1_ACCESS_TOKEN")
 OPENF1_AUTH_ENABLED = bool(OPENF1_ACCESS_TOKEN or (OPENF1_USERNAME and OPENF1_PASSWORD))
+
+# ── Internal API secret for authenticating internal-only endpoints ──
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "changeme-in-production")
 
 OPENF1_TOKEN_STATE = {
     "token": OPENF1_ACCESS_TOKEN,
@@ -238,3 +244,11 @@ async def _openf1_headers(force_refresh: bool = False) -> dict:
         if token:
             headers["Authorization"] = f"Bearer {token}"
     return headers
+
+
+    def _validate_ti_param(value: str, param_name: str, max_length: int = 100):
+        """Validate TracingInsights path parameters to prevent injection attacks."""
+        if not value or len(value) > max_length:
+            raise HTTPException(status_code=400, detail=f"Invalid {param_name}: length constraint")
+        if not re.match(r'^[a-zA-Z0-9\s\-_()]+$', value):
+            raise HTTPException(status_code=400, detail=f"Invalid {param_name}: invalid characters")

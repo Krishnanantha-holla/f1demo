@@ -49,22 +49,21 @@ app.add_middleware(
 )
 
 # ── Import and register route modules ──
-from routes import health, schedule, telemetry, live, ti, misc
+from routes.health import router as health_router
+from routes.schedule import router as schedule_router
+from routes.telemetry import router as telemetry_router
+from routes.live import router as live_router, ws_router
+from routes.ti import router as ti_router
+from routes.misc import router as misc_router, internal_router
 
-app.include_router(health.router, prefix="/api", tags=["Health"])
-app.include_router(schedule.router, prefix="/api", tags=["Schedule & Standings"])
-app.include_router(telemetry.router, prefix="/api", tags=["Telemetry"])
-app.include_router(live.router, prefix="/api", tags=["Live"])
-app.include_router(ti.router, prefix="/api", tags=["TracingInsights"])
-app.include_router(misc.router, prefix="/api", tags=["Misc"])
-
-
-# ══════════════════════════════════════════
-# RUN
-# ══════════════════════════════════════════
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+app.include_router(health_router, prefix="/api", tags=["Health"])
+app.include_router(schedule_router, prefix="/api", tags=["Schedule & Standings"])
+app.include_router(telemetry_router, prefix="/api", tags=["Telemetry"])
+app.include_router(live_router, prefix="/api", tags=["Live"])
+app.include_router(ti_router, prefix="/api", tags=["TracingInsights"])
+app.include_router(misc_router, prefix="/api", tags=["Misc"])
+app.include_router(ws_router, tags=["WebSocket"])  # No /api prefix for WebSocket
+app.include_router(internal_router, tags=["Internal"])  # No /api prefix for internal endpoints
 
 
 # ══════════════════════════════════════════

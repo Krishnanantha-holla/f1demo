@@ -3,12 +3,13 @@ import re
 from fastapi import APIRouter, Request, WebSocket, HTTPException
 
 from utils import (
-    logger, cached_get, safe_cached_get, OPENF1,
-    _validate_ti_param
+    logger, cached_get, safe_cached_get, OPENF1, _validate_ti_param
 )
 from services.live_stream import stream_live_session
 
 router = APIRouter()
+ws_router = APIRouter()
+
 
 
 @router.get("/live/{endpoint}")
@@ -39,7 +40,7 @@ async def meetings(year: int = None):
 
 @router.get("/sessions")
 async def sessions(session_key: str = "latest"):
-   """Get sessions."""
+    """Get sessions."""
     return await safe_cached_get(f"{OPENF1}/sessions?session_key={session_key}", [], ttl=120)
 
 
@@ -152,7 +153,7 @@ async def session_mode():
         return {"mode": "idle", "ts": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()}
 
 
-@router.websocket("/ws/live")
+@ws_router.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
     """WebSocket endpoint for live timing updates."""
     await stream_live_session(websocket, logger, cached_get)
