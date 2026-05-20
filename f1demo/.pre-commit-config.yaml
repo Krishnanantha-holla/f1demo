@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^f1demo/backend/.*\.py$
+      - id: ruff-format
+        files: ^f1demo/backend/.*\.py$
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd f1demo/frontend && npx eslint --max-warnings=0'
+        language: system
+        files: ^f1demo/frontend/src/.*\.(js|jsx)$
+        pass_filenames: false

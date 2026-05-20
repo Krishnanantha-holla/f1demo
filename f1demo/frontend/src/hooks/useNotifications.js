@@ -1,21 +1,20 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 
 export function useNotifications() {
-  const permissionGranted = useRef(false);
-
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      permissionGranted.current = true;
-    }
-  }, []);
+  const permissionGrantedRef = useRef(false);
+  const [permissionGranted, setPermissionGranted] = useState(() => (
+    typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+  ));
 
   const requestPermission = useCallback(async () => {
     if (!('Notification' in window)) return false;
 
     try {
       const permission = await Notification.requestPermission();
-      permissionGranted.current = permission === 'granted';
-      return permissionGranted.current;
+      const granted = permission === 'granted';
+      permissionGrantedRef.current = granted;
+      setPermissionGranted(granted);
+      return granted;
     } catch (err) {
       console.warn('[Notifications] Failed to request permission:', err);
       return false;
@@ -23,8 +22,8 @@ export function useNotifications() {
   }, []);
 
   const notify = useCallback((title, options = {}) => {
-    if (!permissionGranted.current || !('Notification' in window)) return;
-    
+    if (!permissionGrantedRef.current || !('Notification' in window)) return;
+
     try {
       const notification = new Notification(title, {
         icon: '/favicon.svg',
@@ -34,12 +33,12 @@ export function useNotifications() {
 
       // Auto-close after 10 seconds
       setTimeout(() => notification.close(), 10000);
-      
+
       return notification;
     } catch (err) {
       console.warn('[Notifications] Failed to show notification:', err);
     }
   }, []);
 
-  return { notify, requestPermission, permissionGranted: permissionGranted.current };
+  return { notify, requestPermission, permissionGranted };
 }

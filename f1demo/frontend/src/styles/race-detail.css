@@ -1,0 +1,45 @@
+/* Race detail page modular styles extracted from styles.css */
+
+.race-detail-page { animation: fadeSlideUp 0.4s var(--ease-out-expo) both; }
+.race-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.race-detail-top { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+.race-detail-bottom { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+.circuit-map-card .card-body.circuit-map-body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  min-height: 380px;
+}
+.track-layout-container { display: flex; justify-content: center; align-items: center; padding: 0.5rem 0; min-height: 200px; width: 100%; }
+.track-svg { width: 100%; max-height: 400px; filter: drop-shadow(0 4px 16px rgba(225, 6, 0, 0.15)); }
+.track-path-line { animation: fadeIn 1s ease 0.3s both; }
+.circuit-sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
+.circuit-sidebar-title { padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.circuit-sidebar-name { font-size: 1.1rem; font-weight: 900; margin-top: 0.25rem; }
+.circuit-sidebar-stat { padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.circuit-sidebar-big { font-size: 1.8rem; font-weight: 900; line-height: 1.1; margin-top: 0.2rem; }
+.circuit-sidebar-unit { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); margin-left: 0.15rem; }
+.circuit-sidebar-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem; }
+.circuit-sidebar-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.circuit-sidebar-val { font-size: 1.3rem; font-weight: 900; margin-top: 0.15rem; }
+.circuit-weather { padding-top: 0.25rem; }
+.weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.5rem; }
+.weather-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.weather-item:hover { background: rgba(255,255,255,0.04); }
+.weather-icon { font-size: 1.1rem; }
+.weather-val { font-size: 0.85rem; font-weight: 700; }
+.weather-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+.circuit-info-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 0.3rem; }
+.podium-container { display: flex; align-items: flex-end; justify-content: center; gap: 0.5rem; padding: 0.5rem 0; }
+.podium-slot { display: flex; flex-direction: column; align-items: center; flex: 1; animation: podiumRise 0.6s var(--ease-out-expo) both; }
+.podium-img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--bg-dark); }

@@ -171,7 +171,7 @@ function PilotProfile({ driver, standing, allDrivers, standings, bios, onClose }
       <div className={`encyclopedia-backdrop ${closing ? 'closing' : ''}`} onClick={handleClose} />
       <div className={`encyclopedia-panel ${closing ? 'closing' : ''}`}>
         <button className="panel-close" onClick={handleClose}>✕</button>
-        
+
         {/* Massive watermark number */}
         <div className="watermark-number">{driver.driver_number}</div>
 
@@ -340,7 +340,7 @@ export default function Drivers() {
 
         setDrivers(mergedDrivers);
         setBios(bioData.drivers || {});
-        
+
         const sMap = {};
         standingsData.forEach(s => {
           const driverNo = Number(s.driver_number ?? s.Driver?.permanentNumber);

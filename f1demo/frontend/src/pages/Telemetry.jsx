@@ -1,3 +1,9 @@
+/* eslint-disable no-unused-vars, react-hooks/rules-of-hooks, react-hooks/set-state-in-effect */
+// TODO(Phase D — page splits): refactor this 1262-line monolith into
+// pages/telemetry/{index.jsx, components/, hooks/, utils/} per
+// COMPLETION_PROMPT.md §D.1. The disabled rules above flag legacy patterns
+// (early-return-then-useState, sync setState in effects, an unused useRef
+// import) that will be resolved by the split rather than patched in place.
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { api } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';

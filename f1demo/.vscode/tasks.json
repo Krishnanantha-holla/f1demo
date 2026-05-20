@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend: pytest",
+      "type": "shell",
+      "command": "${workspaceFolder}/f1demo/.venv/bin/python -m pytest -q backend/tests",
+      "options": { "cwd": "${workspaceFolder}/f1demo" },
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "backend: dev server",
+      "type": "shell",
+      "command": "${workspaceFolder}/f1demo/.venv/bin/python -m uvicorn main:app --reload --port 8000",
+      "options": { "cwd": "${workspaceFolder}/f1demo/backend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: dev server",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/f1demo/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": { "cwd": "${workspaceFolder}/f1demo/frontend" },
+      "group": "test"
+    },
+    {
+      "label": "frontend: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/f1demo/frontend" },
+      "group": "build"
+    },
+    {
+      "label": "all: ci-equivalent",
+      "dependsOrder": "sequence",
+      "dependsOn": ["backend: pytest", "frontend: lint", "frontend: build"]
+    }
+  ]
+}

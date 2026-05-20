@@ -1,10 +1,10 @@
 """Shared utilities and configuration for F1 Dashboard API."""
+
 import time
 import json
 import asyncio
 import os
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
 from cachetools import TTLCache
@@ -13,14 +13,12 @@ from filelock import FileLock
 from fastapi import HTTPException
 import re
 
-from cache_store import cache_backend_name, cache_clear, cache_lookup, cache_write
 from services.free_context import (
     build_free_context,
     current_year as svc_current_year,
     ensure_utc as svc_ensure_utc,
     event_session_windows as svc_event_session_windows,
 )
-from services.news_service import fetch_news
 
 # ── Structured logging ──
 logger = logging.getLogger("f1dashboard")
@@ -28,12 +26,15 @@ logger = logging.getLogger("f1dashboard")
 # ── Try importing fastf1 (optional — degrades gracefully if not installed) ──
 try:
     import fastf1
-    fastf1.Cache.enable_cache('./cache')
+
+    fastf1.Cache.enable_cache("./cache")
     HAS_FASTF1 = True
 except ImportError:
-     fastf1 = None
+    fastf1 = None
     HAS_FASTF1 = False
-    logger.warning("fastf1 not installed — historical data endpoints will be unavailable")
+    logger.warning(
+        "fastf1 not installed — historical data endpoints will be unavailable"
+    )
 
 # ── Cache setup ──
 CACHE_TTL = 60  # seconds
@@ -55,8 +56,16 @@ OPENF1_PASSWORD = os.getenv("OPENF1_PASSWORD")
 OPENF1_ACCESS_TOKEN = os.getenv("OPENF1_ACCESS_TOKEN")
 OPENF1_AUTH_ENABLED = bool(OPENF1_ACCESS_TOKEN or (OPENF1_USERNAME and OPENF1_PASSWORD))
 
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+
 # ── Internal API secret for authenticating internal-only endpoints ──
-INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "changeme-in-production")
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET")
+if APP_ENV == "production" and (
+    not INTERNAL_SECRET or INTERNAL_SECRET == "changeme-in-production"
+):
+    raise RuntimeError("INTERNAL_SECRET must be set in production")
+if not INTERNAL_SECRET:
+    INTERNAL_SECRET = "changeme-in-development"
 
 OPENF1_TOKEN_STATE = {
     "token": OPENF1_ACCESS_TOKEN,
@@ -74,10 +83,16 @@ def _read_state_file() -> dict:
 
 
 async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
-    """Fetch from cache or HTTP with fallback."""
+    """Fetch from cache or HTTP with fallback.
+
+    Respect per-call `ttl` by incorporating it into the cache key so callers
+    can request different expiry windows without changing the global cache
+    instance TTL.
+    """
+    key = f"{ttl}:{url}"
     async with _cache_lock:
-        if url in _cache:
-            return _cache[url]
+        if key in _cache:
+            return _cache[key]
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         headers = await _openf1_headers()
@@ -94,7 +109,7 @@ async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
         data = resp.json()
 
     async with _cache_lock:
-        _cache[url] = data
+        _cache[key] = data
     return data
 
 
@@ -106,6 +121,12 @@ async def safe_cached_get(url: str, default, ttl: int = CACHE_TTL):
     except Exception as exc:
         logger.warning("safe_cached_get failed %s: %s", url, exc)
         return default
+
+
+async def clear_request_cache() -> None:
+    """Clear the in-process TTLCache used by cached_get."""
+    async with _cache_lock:
+        _cache.clear()
 
 
 def current_year() -> int:
@@ -149,26 +170,42 @@ def _fastf1_schedule_records(year: int) -> list[dict]:
             if candidate is not None:
                 end = candidate
                 break
-        records.append({
-            "meeting_key": round_num,
-            "year": year,
-            "meeting_name": data.get("EventName") or data.get("OfficialEventName") or f"Round {round_num}",
-            "location": data.get("Location") or data.get("Country") or "",
-            "country_name": data.get("Country") or data.get("CountryName") or "",
-            "circuit_short_name": data.get("CircuitShortName") or data.get("Location") or data.get("EventName") or "",
-            "circuit_key": data.get("CircuitKey"),
-            "date_start": start.isoformat() if hasattr(start, "isoformat") else None,
-            "date_end": end.isoformat() if hasattr(end, "isoformat") else None,
-            "source": "fastf1",
-            "_schedule_row": data,
-        })
+        records.append(
+            {
+                "meeting_key": round_num,
+                "year": year,
+                "meeting_name": data.get("EventName")
+                or data.get("OfficialEventName")
+                or f"Round {round_num}",
+                "location": data.get("Location") or data.get("Country") or "",
+                "country_name": data.get("Country") or data.get("CountryName") or "",
+                "circuit_short_name": data.get("CircuitShortName")
+                or data.get("Location")
+                or data.get("EventName")
+                or "",
+                "circuit_key": data.get("CircuitKey"),
+                "date_start": start.isoformat()
+                if hasattr(start, "isoformat")
+                else None,
+                "date_end": end.isoformat() if hasattr(end, "isoformat") else None,
+                "source": "fastf1",
+                "_schedule_row": data,
+            }
+        )
     return records
 
 
 def _fastf1_sessions_for_round(year: int, meeting_key: int) -> list[dict]:
     """Get sessions for a specific round from FastF1."""
     schedule_records = _fastf1_schedule_records(year)
-    match = next((row for row in schedule_records if int(row.get("meeting_key") or -1) == int(meeting_key)), None)
+    match = next(
+        (
+            row
+            for row in schedule_records
+            if int(row.get("meeting_key") or -1) == int(meeting_key)
+        ),
+        None,
+    )
     if not match:
         return []
 
@@ -176,13 +213,15 @@ def _fastf1_sessions_for_round(year: int, meeting_key: int) -> list[dict]:
     windows = svc_event_session_windows(row)
     sessions = []
     for index, window in enumerate(windows, start=1):
-        sessions.append({
-            "session_key": int(meeting_key) * 10 + index,
-            "session_name": window["name"],
-            "date_start": window["start"].isoformat(),
-            "date_end": window["end"].isoformat(),
-            "source": "fastf1",
-        })
+        sessions.append(
+            {
+                "session_key": int(meeting_key) * 10 + index,
+                "session_name": window["name"],
+                "date_start": window["start"].isoformat(),
+                "date_end": window["end"].isoformat(),
+                "source": "fastf1",
+            }
+        )
     return sessions
 
 
@@ -195,7 +234,10 @@ async def _fetch_openf1_token() -> tuple[str | None, int]:
         resp = await client.post(
             OPENF1_TOKEN_URL,
             data={"username": OPENF1_USERNAME, "password": OPENF1_PASSWORD},
-            headers={"Content-Type": "application/x-www-form-urlencoded", "accept": "application/json"},
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "accept": "application/json",
+            },
         )
 
     if resp.status_code != 200:
@@ -223,7 +265,11 @@ async def _get_openf1_token(force_refresh: bool = False) -> str | None:
     async with OPENF1_TOKEN_LOCK:
         now = time.time()
         current = OPENF1_TOKEN_STATE.get("token")
-        if not force_refresh and current and now < OPENF1_TOKEN_STATE.get("expires_at", 0):
+        if (
+            not force_refresh
+            and current
+            and now < OPENF1_TOKEN_STATE.get("expires_at", 0)
+        ):
             return current
 
         token, expires_in = await _fetch_openf1_token()
@@ -246,9 +292,13 @@ async def _openf1_headers(force_refresh: bool = False) -> dict:
     return headers
 
 
-    def _validate_ti_param(value: str, param_name: str, max_length: int = 100):
-        """Validate TracingInsights path parameters to prevent injection attacks."""
-        if not value or len(value) > max_length:
-            raise HTTPException(status_code=400, detail=f"Invalid {param_name}: length constraint")
-        if not re.match(r'^[a-zA-Z0-9\s\-_()]+$', value):
-            raise HTTPException(status_code=400, detail=f"Invalid {param_name}: invalid characters")
+def _validate_ti_param(value: str, param_name: str, max_length: int = 100):
+    """Validate TracingInsights path parameters to prevent injection attacks."""
+    if not value or len(value) > max_length:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid {param_name}: length constraint"
+        )
+    if not re.match(r"^[a-zA-Z0-9\s\-_()]+$", value):
+        raise HTTPException(
+            status_code=400, detail=f"Invalid {param_name}: invalid characters"
+        )

@@ -1,0 +1,9 @@
+:root[data-theme='light'] {
+  --bg-darkest: #f7f7fa;
+  --bg-dark: #ededf4;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-glass: rgba(255, 255, 255, 0.75);
+  --text: #17171c;
+  --text-muted: #5b5b66;
+  --border: rgba(10, 10, 20, 0.12);
+}

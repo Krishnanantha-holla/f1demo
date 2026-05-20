@@ -2,6 +2,7 @@
 Runs 24/7. Watches F1 calendar, detects live sessions, polls TracingInsights
 for new data commits, handles season rollover. Zero manual intervention.
 """
+
 import json
 import time
 import os
@@ -14,19 +15,28 @@ from filelock import FileLock
 
 try:
     import fastf1
-    fastf1.Cache.enable_cache('./cache')
+
+    fastf1.Cache.enable_cache("./cache")
     HAS_FASTF1 = True
 except ImportError:
     HAS_FASTF1 = False
 
 CURRENT_YEAR = datetime.now().year
-STATE_FILE = Path('./state.json')
-STATE_LOCK = FileLock(str(STATE_FILE) + '.lock')
+STATE_FILE = Path("./state.json")
+STATE_LOCK = FileLock(str(STATE_FILE) + ".lock")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 GH_HEADERS = {
     "Accept": "application/vnd.github.v3+json",
     **({"Authorization": f"Bearer {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}),
 }
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET")
+if APP_ENV == "production" and (
+    not INTERNAL_SECRET or INTERNAL_SECRET == "changeme-in-production"
+):
+    raise RuntimeError("INTERNAL_SECRET must be set in production")
+if not INTERNAL_SECRET:
+    INTERNAL_SECRET = "changeme-in-development"
 
 
 def get_state():
@@ -85,9 +95,18 @@ def check_tracinginsights():
 def trigger_refresh():
     """Tell FastAPI backend to clear its cache."""
     try:
-        requests.post("http://localhost:8000/internal/refresh-cache", timeout=5)
+        headers = {"X-Internal-Secret": INTERNAL_SECRET} if INTERNAL_SECRET else {}
+        resp = requests.post(
+            "http://localhost:8000/internal/refresh-cache",
+            headers=headers,
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            print(f"[AUTOMATOR] refresh-cache response: {resp.status_code} {resp.text}")
+        else:
+            print("[AUTOMATOR] refresh-cache succeeded")
     except Exception:
-        pass
+        print("[AUTOMATOR] refresh-cache request failed")
 
 
 def set_mode(mode: str):
@@ -97,12 +116,9 @@ def set_mode(mode: str):
         state["mode"] = mode
         save_state(state)
         print(f"[AUTOMATOR] Mode → {mode}")
-        # Write mode file for frontend polling
-        public = Path('./public')
-        public.mkdir(exist_ok=True)
-        (public / 'session_mode.json').write_text(
-            json.dumps({"mode": mode, "ts": datetime.now().isoformat()})
-        )
+        # NOTE: writing `public/session_mode.json` is a dead-sidechannel; the
+        # backend exposes `/api/session-mode` and that should be the source
+        # of truth. Do not write the public file to avoid stale state.
 
 
 def check_season_rollover():

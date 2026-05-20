@@ -1,4 +1,5 @@
 """Shared HTTP response cache: in-process memory plus optional Redis (REDIS_URL)."""
+
 from __future__ import annotations
 
 import json

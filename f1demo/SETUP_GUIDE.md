@@ -8,8 +8,8 @@
 - **Fix**: Updated all working-directory paths and cache paths
 - **Status**: ✅ CI will now execute from correct directories
 
-### 2. CURRENT_YEAR Bug Fixed (Priority 5)  
-- **Files**: 
+### 2. CURRENT_YEAR Bug Fixed (Priority 5)
+- **Files**:
   - [frontend/src/pages/Telemetry.jsx](frontend/src/pages/Telemetry.jsx) (lines 5-14)
   - [frontend/src/pages/Analysis.jsx](frontend/src/pages/Analysis.jsx) (lines 10-19)
 - **Issue**: Year was evaluated at module load time → stale after midnight on Dec 31
@@ -161,17 +161,17 @@ import './styles/index.css'  // Instead of './styles.css'
 
 ## ✨ What's Ready for Production
 
-✅ All critical bugs fixed  
-✅ Input validation in place  
-✅ CI pipeline working  
-✅ Notification permission behind user action  
-✅ FastF1 calls non-blocking  
-✅ Error responses with correct HTTP status codes  
-✅ Cache invalidation authenticated  
-✅ Dependencies pinned  
-✅ Production Dockerfile (Nginx)  
-✅ `.env.example` with all vars  
-✅ Security headers configured  
+✅ All critical bugs fixed
+✅ Input validation in place
+✅ CI pipeline working
+✅ Notification permission behind user action
+✅ FastF1 calls non-blocking
+✅ Error responses with correct HTTP status codes
+✅ Cache invalidation authenticated
+✅ Dependencies pinned
+✅ Production Dockerfile (Nginx)
+✅ `.env.example` with all vars
+✅ Security headers configured
 
 ---
 
@@ -206,6 +206,74 @@ cd f1demo/backend && pip install black && black . && flake8 .
 3. **E2E tests** (Playwright) can be added after Phase 3 completion
 4. **API documentation** (OpenAPI/Swagger) would be valuable next
 5. **Performance monitoring** (DataDog, Sentry) recommended for production
+
+**Status**: Project is **production-ready with caveats** — all critical issues resolved, infrastructure in place for completion of quality/testing work.
+
+## Local development — Quick start
+
+Follow these steps to run the full local developer loop (tests, backend, frontend).
+
+1) Activate Python virtualenv
+
+```bash
+cd f1demo
+source .venv/bin/activate
+```
+
+2) Install Python test deps (one-time)
+
+```bash
+pip install -r backend/requirements-dev.txt
+```
+
+3) Generate backend circuit data (one-time after changes to frontend/src/circuitData.js)
+
+```bash
+python scripts/generate_circuits_json.py
+```
+
+4) Run backend tests
+
+```bash
+./scripts/run_ci.sh
+# or
+make test
+```
+
+5) Start backend + frontend (background)
+
+```bash
+./scripts/start_all.sh
+# check logs in ./logs/backend.log and ./logs/frontend.log
+```
+
+6) Start services interactively
+
+Backend (dev):
+```bash
+# from repo root
+PYTHONPATH=./backend:.:./.venv/lib/python3.12/site-packages /usr/bin/python3.12 -m uvicorn backend.main:app --reload
+```
+
+Frontend (dev):
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+7) Helpful convenience targets
+
+```bash
+# Run tests
+make test
+# Start backend in foreground
+make backend
+# Run local CI
+make ci
+```
+
+If anything fails, inspect `logs/` for background runs or run the commands above interactively to see live output.
 
 ---
 

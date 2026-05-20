@@ -14,8 +14,9 @@ export default function SessionSelector({ onChange }) {
 
   useEffect(() => {
     if (!event) return;
-    api.tiSessions(year, event).then(setSessions).catch(() => setSessions([]));
-    setSession('');
+    api.tiSessions(year, event)
+      .then((s) => { setSessions(s); setSession(''); })
+      .catch(() => setSessions([]));
   }, [year, event]);
 
   useEffect(() => {

@@ -1,0 +1,130 @@
+/* Dashboard page modular styles extracted from styles.css */
+
+.top-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  align-items: start;
+}
+
+.top-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.standings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.bottom-dashboard-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.next-race-card {
+  border-left: 3px solid var(--f1-red);
+  background: linear-gradient(135deg, rgba(225, 6, 0, 0.06) 0%, var(--bg-card-glass) 40%);
+}
+
+.next-race-content { padding: 1.25rem; }
+.next-race-label {
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 3px;
+  color: var(--f1-red);
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+.next-race-name { font-size: 1.35rem; font-weight: 900; margin-bottom: 0.2rem; }
+.next-race-circuit { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem; }
+.next-race-meta { display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.meta-item-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); }
+.meta-item-value { font-size: 0.95rem; font-weight: 700; }
+
+.countdown { display: flex; gap: 0.6rem; }
+.cd-item {
+  text-align: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  min-width: 50px;
+  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s;
+}
+.cd-item:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(225, 6, 0, 0.15);
+}
+.cd-num { font-size: 1.3rem; font-weight: 900; color: var(--f1-red); line-height: 1; }
+.cd-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-top: 2px; }
+.dashboard-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.dashboard-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.03);
+}
+.dashboard-pill-live {
+  color: #fff;
+  border-color: rgba(255, 30, 0, 0.45);
+  background: linear-gradient(135deg, rgba(255, 30, 0, 0.85), rgba(140, 16, 0, 0.85));
+}
+.weekend-radar-card .card-body,
+.live-session-card .card-body,
+.podium-card .card-body {
+  padding: 1rem;
+}
+.session-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.session-stack.compact {
+  margin-top: 1rem;
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  transition: transform 0.2s var(--ease-out-expo), border-color 0.2s var(--ease-out-expo), background 0.2s var(--ease-out-expo);
+}
+.session-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.14);
+}
+.session-row.active {
+  border-color: rgba(255, 30, 0, 0.45);
+  background: linear-gradient(135deg, rgba(255, 30, 0, 0.08), rgba(255,255,255,0.02));
+}
+.session-row-name { font-size: 0.92rem; font-weight: 800; }
+.session-row-date { margin-top: 0.15rem; font-size: 0.74rem; color: var(--text-muted); }
+.free-mode-panel { display: flex; flex-direction: column; gap: 0.9rem; }
+.free-mode-copy {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(255, 30, 0, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 30, 0, 0.08), rgba(255,255,255,0.02));
+}

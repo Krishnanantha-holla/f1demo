@@ -29,7 +29,7 @@ export default function GapChart({ intervalsData = [], roster = [] }) {
       const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${PAD.left + ((point.lap - 1) / Math.max(1, Math.max(...points.map((p) => p.lap)) - 1)) * innerW},${PAD.top + (1 - ((point.gap + 5) / 20)) * innerH}`).join(' ');
       return { driver, points, path };
     });
-  }, [intervalsData]);
+  }, [intervalsData, innerW, innerH, PAD.left, PAD.top]);
 
   const teamColor = (driverCode) => {
     const driver = roster.find((entry) => entry.name_acronym === driverCode || String(entry.driver_number) === String(driverCode));

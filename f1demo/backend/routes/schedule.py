@@ -1,18 +1,23 @@
 """Schedule, standings, and free context endpoints."""
+
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Request, Query, HTTPException
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from fastapi import APIRouter, Request, HTTPException
 
 from utils import (
-    logger, HAS_FASTF1, fastf1, current_year, _build_free_context,
-    cached_get, JOLPICA, OPENF1, _fastf1_schedule_records, _fastf1_sessions_for_round
+    logger,
+    HAS_FASTF1,
+    fastf1,
+    current_year,
+    _build_free_context,
+    cached_get,
+    JOLPICA,
+    OPENF1,
 )
+from limiter import limiter
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 
 @router.get("/schedule")
@@ -21,7 +26,7 @@ async def schedule(year: int = None):
     yr = year or current_year()
     if not HAS_FASTF1:
         raise HTTPException(status_code=503, detail="FastF1 not installed")
-    
+
     def _get_schedule():
         s = fastf1.get_event_schedule(yr, include_testing=False)
         records = s.to_dict(orient="records")
@@ -30,7 +35,7 @@ async def schedule(year: int = None):
                 if hasattr(v, "isoformat"):
                     r[k] = v.isoformat()
         return records
-    
+
     try:
         return await asyncio.to_thread(_get_schedule)
     except Exception as e:
@@ -43,12 +48,18 @@ async def next_race():
     """Get next upcoming race."""
     if not HAS_FASTF1:
         raise HTTPException(status_code=503, detail="FastF1 not installed")
-    
+
     def _get_next_race():
         yr = current_year()
         s = fastf1.get_event_schedule(yr, include_testing=False)
         now = datetime.now(timezone.utc)
-        upcoming = s[s["EventDate"].dt.tz_localize("UTC") > now] if s["EventDate"].dt.tz is None else s[s["EventDate"] > now]
+        ts = s["EventDate"]
+        # Normalize to UTC regardless of whether the column is tz-aware or tz-naive.
+        if getattr(ts.dt, "tz", None) is None:
+            ts = ts.dt.tz_localize("UTC")
+        else:
+            ts = ts.dt.tz_convert("UTC")
+        upcoming = s[ts > now]
         if upcoming.empty:
             return {}
         row = upcoming.iloc[0].to_dict()
@@ -56,7 +67,7 @@ async def next_race():
             if hasattr(v, "isoformat"):
                 row[k] = v.isoformat()
         return row
-    
+
     try:
         return await asyncio.to_thread(_get_next_race)
     except Exception as e:
@@ -74,7 +85,9 @@ async def driver_standings(request: Request, year: int = None):
         return data["MRData"]["StandingsTable"]["StandingsLists"][0]["DriverStandings"]
     except Exception:
         try:
-            return await cached_get(f"{OPENF1}/championship_drivers?session_key=latest", ttl=120)
+            return await cached_get(
+                f"{OPENF1}/championship_drivers?session_key=latest", ttl=120
+            )
         except Exception:
             return []
 
@@ -86,10 +99,14 @@ async def constructor_standings(request: Request, year: int = None):
     yr = year or current_year()
     try:
         data = await cached_get(f"{JOLPICA}/{yr}/constructorStandings.json", ttl=300)
-        return data["MRData"]["StandingsTable"]["StandingsLists"][0]["ConstructorStandings"]
+        return data["MRData"]["StandingsTable"]["StandingsLists"][0][
+            "ConstructorStandings"
+        ]
     except Exception:
         try:
-            return await cached_get(f"{OPENF1}/championship_teams?session_key=latest", ttl=120)
+            return await cached_get(
+                f"{OPENF1}/championship_teams?session_key=latest", ttl=120
+            )
         except Exception:
             return []
 
@@ -117,8 +134,10 @@ async def race_results(year: int, round_num: int):
 @router.get("/free/context")
 async def free_context(year: int = None):
     """Get free context data."""
+
     def _get_context():
         return _build_free_context(year)
+
     try:
         return await asyncio.to_thread(_get_context)
     except Exception as e:
@@ -134,7 +153,9 @@ async def free_roster(year: int = None):
 
     try:
         standings = await cached_get(f"{JOLPICA}/{yr}/driverStandings.json", ttl=300)
-        driver_standings = standings["MRData"]["StandingsTable"]["StandingsLists"][0]["DriverStandings"]
+        driver_standings = standings["MRData"]["StandingsTable"]["StandingsLists"][0][
+            "DriverStandings"
+        ]
     except Exception:
         driver_standings = []
 
@@ -167,21 +188,32 @@ async def free_roster(year: int = None):
             if not number:
                 continue
             number = int(number)
-            entry = roster.setdefault(number, {
-                "driver_number": number,
-                "first_name": driver.get("givenName") or "",
-                "last_name": driver.get("familyName") or "",
-                "full_name": f"{driver.get('givenName', '')} {driver.get('familyName', '')}".strip(),
-                "name_acronym": driver.get("code") or "",
-                "team_name": None,
-                "position": 0,
-                "points": 0,
-                "wins": 0,
-            })
+            entry = roster.setdefault(
+                number,
+                {
+                    "driver_number": number,
+                    "first_name": driver.get("givenName") or "",
+                    "last_name": driver.get("familyName") or "",
+                    "full_name": f"{driver.get('givenName', '')} {driver.get('familyName', '')}".strip(),
+                    "name_acronym": driver.get("code") or "",
+                    "team_name": None,
+                    "position": 0,
+                    "points": 0,
+                    "wins": 0,
+                },
+            )
             constructor = result.get("Constructor") or {}
             if constructor.get("name"):
                 entry["team_name"] = constructor.get("name")
     except Exception:
         pass
 
-    return list(sorted(roster.values(), key=lambda item: (item.get("position") or 999, item.get("driver_number") or 999)))
+    return list(
+        sorted(
+            roster.values(),
+            key=lambda item: (
+                item.get("position") or 999,
+                item.get("driver_number") or 999,
+            ),
+        )
+    )

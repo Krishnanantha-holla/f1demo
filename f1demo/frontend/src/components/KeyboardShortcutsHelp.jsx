@@ -20,7 +20,7 @@ export default function KeyboardShortcutsHelp() {
 
   if (!show) {
     return (
-      <button 
+      <button
         className="shortcuts-trigger"
         onClick={() => setShow(true)}
         title="Keyboard shortcuts (Press ?)"

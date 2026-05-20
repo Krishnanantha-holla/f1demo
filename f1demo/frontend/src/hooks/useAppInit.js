@@ -1,3 +1,5 @@
+// NOTE: blocking Promise.all is intentional pre-Phase-2. Glance-first, independent
+// widget loading is tracked in PHASE_1_ROADMAP.md > "Post-Phase 1 Work".
 import { useEffect } from 'react';
 import { api } from '../api';
 import { useF1Store } from '../store/useF1Store';

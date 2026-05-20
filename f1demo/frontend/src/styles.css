@@ -2,6 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&display=swap');
 
 :root {
+  color-scheme: dark;
   --f1-red: #ff1e00;
   --f1-red-glow: rgba(255, 30, 0, 0.4);
   --bg-darkest: #09090b;
@@ -43,6 +44,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   display: flex;
+  accent-color: var(--f1-red);
 }
 
 /* Beautiful dotted radial background */
@@ -184,15 +186,26 @@ body::before {
   white-space: nowrap;
 }
 .sidebar-icon svg { flex-shrink: 0; }
+.sidebar-icon { position: relative; }
 .sidebar-icon:hover {
   background: rgba(255,255,255,0.05);
   color: var(--text);
-  transform: translateX(2px);
+  transform: translateX(1px);
 }
 .sidebar-icon.active {
-  background: var(--f1-red);
+  background: linear-gradient(90deg, rgba(255,30,0,0.18), rgba(255,30,0,0.04));
   color: #fff;
-  box-shadow: 0 2px 12px rgba(225, 6, 0, 0.4);
+  box-shadow: 0 2px 12px rgba(225, 6, 0, 0.25);
+}
+.sidebar-icon.active::before {
+  content: '';
+  position: absolute;
+  left: -0.75rem;
+  top: 8px; bottom: 8px;
+  width: 3px;
+  background: var(--f1-red);
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 12px rgba(255,30,0,0.6);
 }
 .sidebar-spacer { flex: 1; }
 .sidebar-footer {
@@ -919,14 +932,14 @@ main {
   background-repeat: no-repeat;
   background-position: right 1rem center;
 }
-.telem-select-group select:hover { 
-  border-color: var(--text-muted); 
+.telem-select-group select:hover {
+  border-color: var(--text-muted);
   background: #161622;
 }
-.telem-select-group select:focus { 
-  border-color: var(--f1-red); 
-  box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.15); 
-  outline: none; 
+.telem-select-group select:focus {
+  border-color: var(--f1-red);
+  box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.15);
+  outline: none;
 }
 
 /* Driver chips selector */
@@ -3904,4 +3917,164 @@ main {
     right: 1rem;
     bottom: 1rem;
   }
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Step 11 — UI/UX polish primitives (REMEDIATION_PROMPT.md)
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* 11.1 — Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Keep the live pulse subtle so live UX still reads as live */
+  .lc-live-dot { animation: none; opacity: 1; }
+}
+
+/* 11.2 — Keyboard-only focus ring */
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus {
+  outline: none;
+}
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--f1-red);
+  outline-offset: 2px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px rgba(255, 30, 0, 0.18);
+  transition: box-shadow 0.15s var(--ease-out-expo);
+}
+
+/* 11.3 — Skip link */
+.skip-link {
+  position: fixed;
+  top: -40px;
+  left: 1rem;
+  z-index: 1000;
+  background: var(--f1-red);
+  color: #fff;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  transition: top 0.2s var(--ease-out-expo);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  text-decoration: none;
+}
+.skip-link:focus-visible { top: 1rem; }
+
+/* 11.4 — sr-only utility */
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+/* 11.5 — Route entrance frame */
+.route-frame {
+  animation: fadeSlideUp 280ms var(--ease-out-expo) both;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-frame { animation: none; }
+}
+
+/* 11.6 — Shimmer skeletons (uses existing @keyframes shimmer) */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.10) 50%,
+    rgba(255,255,255,0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.page-skeleton {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 960px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer { animation: none; background: rgba(255,255,255,0.06); }
+}
+
+/* 11.8 — FlipValue cross-fade */
+.flip-value {
+  display: inline-block;
+  transition: opacity 160ms var(--ease-out-expo), transform 160ms var(--ease-out-expo);
+  font-variant-numeric: tabular-nums;
+}
+.flip-out { opacity: 0; transform: translateY(-4px); }
+.flip-in  { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .flip-value { transition: none; }
+  .flip-out, .flip-in { transform: none; }
+}
+
+/* 11.9 — Toast surface */
+.toast-host {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 999;
+  max-width: min(360px, 90vw);
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  background: var(--bg-card-glass);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+  animation: slideInRight 320ms var(--ease-out-expo) both;
+  font-size: 0.88rem;
+}
+.toast-info    { border-left: 3px solid var(--cyan); }
+.toast-success { border-left: 3px solid var(--green); }
+.toast-error   { border-left: 3px solid var(--f1-red); box-shadow: 0 12px 30px rgba(255,30,0,0.25); }
+.toast-close {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+.toast-close:hover { color: var(--text); }
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+/* 11.13 — Sidebar polish: reduced-motion safety */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-icon, .sidebar-icon:hover { transform: none; }
+}
+
+/* 11.14 — Smooth scroll + selection color */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+::selection {
+  background: rgba(255, 30, 0, 0.35);
+  color: #fff;
 }

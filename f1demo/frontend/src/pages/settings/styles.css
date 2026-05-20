@@ -1,0 +1,31 @@
+.settings-page {
+  display: grid;
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.settings-hero,
+.settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.settings-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.settings-reset {
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+}

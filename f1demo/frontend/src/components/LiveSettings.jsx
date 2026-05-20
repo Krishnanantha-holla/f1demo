@@ -1,27 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
 
 export default function LiveSettings() {
   const { requestPermission } = useNotifications();
-  const [settings, setSettings] = useState({
+  const defaultSettings = {
     notifications: true,
     sound: true,
     overtakeAlerts: true,
     raceControlAlerts: true,
     autoMinimize: false,
+  };
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('liveSettings');
+      return saved ? JSON.parse(saved) : defaultSettings;
+    } catch (e) {
+      console.debug('liveSettings parse error', e);
+      return defaultSettings;
+    }
   });
   const [notificationPermission, setNotificationPermission] = useState(() => (
     'Notification' in window ? Notification.permission : 'unsupported'
   ));
-
-  useEffect(() => {
-    const saved = localStorage.getItem('liveSettings');
-    if (saved) {
-      try {
-        setSettings(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
 
   const updateSetting = (key, value) => {
     const newSettings = { ...settings, [key]: value };
@@ -89,23 +89,4 @@ export default function LiveSettings() {
   );
 }
 
-export function useLiveSettings() {
-  const [settings, setSettings] = useState({
-    notifications: true,
-    sound: true,
-    overtakeAlerts: true,
-    raceControlAlerts: true,
-    autoMinimize: false,
-  });
-
-  useEffect(() => {
-    const saved = localStorage.getItem('liveSettings');
-    if (saved) {
-      try {
-        setSettings(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
-
-  return settings;
-}
+// useLiveSettings moved to ../hooks/useLiveSettings.js

@@ -6,7 +6,9 @@ import requests
 
 
 year = 2026
-r = requests.get(f"https://api.jolpi.ca/ergast/f1/{year}/driverStandings.json", timeout=15)
+r = requests.get(
+    f"https://api.jolpi.ca/ergast/f1/{year}/driverStandings.json", timeout=15
+)
 standings = r.json()["MRData"]["StandingsTable"]["StandingsLists"][0]["DriverStandings"]
 
 drivers = {}

@@ -13,7 +13,7 @@ function stripHtml(html) {
 function timeAgo(dateStr) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  
+
   const seconds = Math.floor((new Date() - d) / 1000);
   let interval = seconds / 31536000;
   if (interval > 1) return Math.floor(interval) + "y ago";
@@ -66,18 +66,18 @@ function NewsCard({ article, index }) {
   const summary = stripHtml(article.summary);
 
   return (
-    <a 
+    <a
       ref={cardRef}
-      href={article.link} 
-      target="_blank" 
-      rel="noopener noreferrer" 
+      href={article.link}
+      target="_blank"
+      rel="noopener noreferrer"
       className="news-card-modern"
       style={{ '--delay': `${Math.min(index * 0.05, 1)}s` }}
     >
       {article.image && !imageError && (
         <div className="news-card-image-wrapper">
-          <img 
-            src={article.image} 
+          <img
+            src={article.image}
             alt={article.title}
             className={`news-card-image ${imageLoaded ? 'loaded' : ''}`}
             onLoad={() => setImageLoaded(true)}
@@ -88,7 +88,7 @@ function NewsCard({ article, index }) {
           <div className="news-card-image-overlay" />
         </div>
       )}
-      
+
       <div className="news-card-content">
         <div className="news-card-meta">
           <span className="news-source" style={{ color: sourceColor }}>
@@ -96,9 +96,9 @@ function NewsCard({ article, index }) {
           </span>
           <span className="news-time">{timeAgo(article.published)}</span>
         </div>
-        
+
         <h3 className="news-card-title">{article.title}</h3>
-        
+
         {summary && (
           <p className="news-card-summary">{summary}</p>
         )}
@@ -131,7 +131,7 @@ export default function NewsFeed() {
       try {
         const data = await api.news();
         if (cancelled) return;
-        
+
         if (!data || data.length === 0) {
           setStatus('empty');
         } else {
@@ -149,10 +149,10 @@ export default function NewsFeed() {
   }, []);
 
   const sources = [...new Set(news.map(n => n.source))].sort();
-  
+
   const filteredNews = news.filter(article => {
     const matchesFilter = filter === 'all' || article.source === filter;
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       stripHtml(article.summary).toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -239,7 +239,7 @@ export default function NewsFeed() {
               <circle cx="11" cy="11" r="8"/>
               <path d="m21 21-4.35-4.35"/>
             </svg>
-            <input 
+            <input
               type="text"
               placeholder="Search news..."
               value={searchQuery}
@@ -250,7 +250,7 @@ export default function NewsFeed() {
             )}
           </div>
 
-          <select 
+          <select
             className="news-filter"
             value={filter}
             onChange={e => setFilter(e.target.value)}

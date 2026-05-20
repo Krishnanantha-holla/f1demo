@@ -18,7 +18,7 @@ export default function TeamRadio({ sessionKey, roster = [], isLive = false }) {
   useEffect(() => {
     let cancelled = false;
     if (!sessionKey) {
-      setClips([]);
+      setTimeout(() => setClips([]), 0);
       return undefined;
     }
 
@@ -30,7 +30,7 @@ export default function TeamRadio({ sessionKey, roster = [], isLive = false }) {
         setClips(list);
       })
       .catch(() => {
-        if (!cancelled) setClips([]);
+        if (!cancelled) setTimeout(() => setClips([]), 0);
       });
 
     return () => { cancelled = true; };

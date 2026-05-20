@@ -6,31 +6,7 @@ import { Loading, ErrorMsg, formatDateFull } from '../components/Shared';
 import WeatherStrip from '../components/WeatherStrip';
 import TeamRadio from '../components/TeamRadio';
 import GapChart from '../components/GapChart';
-
-// ── Helpers ──
-function fmtLap(secs) {
-  if (!secs && secs !== 0) return '—';
-  const m = Math.floor(secs / 60);
-  const s = (secs % 60).toFixed(3).padStart(6, '0');
-  return m > 0 ? `${m}:${s}` : s;
-}
-
-function fmtGap(gap) {
-  if (!gap && gap !== 0) return '—';
-  if (typeof gap === 'string') return gap;
-  if (gap === 0) return 'WINNER';
-  return `+${gap.toFixed(3)}s`;
-}
-
-// ── Helper: rotate point around center ──
-function rotatePoint(x, y, angle, cx, cy) {
-  const rad = (angle * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const dx = x - cx;
-  const dy = y - cy;
-  return { x: dx * cos - dy * sin + cx, y: dy * cos + dx * sin + cy };
-}
+import { fmtLap, fmtGap, rotatePoint } from './raceDetail/utils';
 
 // ── Real Track Map from MultiViewer data ──
 function RealTrackMap({ mapData }) {
@@ -342,14 +318,14 @@ function LapTimeChart({ lapData, driverMap }) {
         {drivers.map((dn, dIdx) => {
           const laps = lapData[dn].filter(l => l.lap_duration && l.lap_duration > 0 && l.lap_duration >= minT && l.lap_duration <= maxT);
           if (laps.length < 2) return null;
-          
+
           const teamName = driverMap[Number(dn)]?.team_name || '';
           const sameTeamIndex = drivers.slice(0, dIdx).filter(prevDn => driverMap[Number(prevDn)]?.team_name === teamName).length;
-          
+
           const color = driverMap[Number(dn)]?.team_colour ? `#${driverMap[Number(dn)].team_colour}` : teamColors[dIdx];
           const dash = sameTeamIndex > 0 ? '4 4' : 'none'; // Distinguish teammates
-          
-          const points = laps.map((l, i) => {
+
+          const points = laps.map((l) => {
             const x = padL + (l.lap_number / maxLaps) * innerW;
             const y = padT + ((l.lap_duration - minT) / (maxT - minT)) * innerH;
             return `${x},${y}`;
@@ -375,12 +351,12 @@ function LapTimeChart({ lapData, driverMap }) {
           const teamName = d?.team_name || '';
           const sameTeamIndex = drivers.slice(0, i).filter(prevDn => driverMap[Number(prevDn)]?.team_name === teamName).length;
           const color = d?.team_colour ? `#${d.team_colour}` : teamColors[i];
-          
+
           return (
             <div key={dn} className="lap-chart-legend-item">
-              <span style={{ 
-                width: 12, height: 3, 
-                borderRadius: 2, 
+              <span style={{
+                width: 12, height: 3,
+                borderRadius: 2,
                 display: 'inline-block',
                 borderStyle: sameTeamIndex > 0 ? 'dashed' : 'solid',
                 borderColor: color,
@@ -734,7 +710,7 @@ export default function RaceDetail() {
   // Detect retirements: DNF or completed significantly fewer laps than leader
   const maxLaps = results.length > 0 ? Math.max(...results.map(r => r.number_of_laps || 0)) : 0;
   const retirements = results.filter(r => r.dnf || r.dns || (r.number_of_laps > 0 && r.number_of_laps < maxLaps * 0.9 && !r.position)).length;
-  const dnsList = results.filter(r => r.dns);
+  // const dnsList = results.filter(r => r.dns); // unused
 
   // Overtake stats
   const totalOvertakes = overtakeData.length;

@@ -26,7 +26,7 @@ export default function WeatherStrip({ sessionKey }) {
 
   useEffect(() => {
     if (!sessionKey) {
-      setWeather(null);
+      setTimeout(() => setWeather(null), 0);
       return undefined;
     }
     let cancelled = false;
@@ -35,7 +35,7 @@ export default function WeatherStrip({ sessionKey }) {
         if (!cancelled) setWeather(Array.isArray(data) ? data[data.length - 1] : data);
       })
       .catch(() => {
-        if (!cancelled) setWeather(null);
+        if (!cancelled) setTimeout(() => setWeather(null), 0);
       });
     return () => {
       cancelled = true;

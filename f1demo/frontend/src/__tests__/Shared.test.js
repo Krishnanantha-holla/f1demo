@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatDateFull, pad, eventName } from '../components/Shared';
+import { formatDate, formatDateFull, pad, eventName } from '../utils/sharedUtils';
 
 describe('Shared utility functions', () => {
   describe('pad', () => {

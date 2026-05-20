@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { getCircuitData } from '../circuitData';
-import { Loading, ErrorMsg, formatDate, formatDateFull } from '../components/Shared';
+import { Loading, ErrorMsg } from '../components/Shared';
+import { formatDate } from '../utils/sharedUtils';
 
 // ── Helper: rotate point for track map ──
 function rotatePoint(x, y, angle, cx, cy) {
@@ -263,7 +264,7 @@ export default function Calendar() {
                 try {
                   const md = await api.circuitMap(mtg.circuit_key, mtg.year);
                   if (md && md.x) mapByKey[mtg.meeting_key] = md;
-                } catch {}
+                } catch { /* ignore circuit map errors */ }
               }
 
               // For past races, fetch podium results
@@ -282,7 +283,7 @@ export default function Calendar() {
                         .sort((a, b) => (a.position || 99) - (b.position || 99))
                         .slice(0, 3);
                     }
-                  } catch {}
+                  } catch { /* ignore session result errors */ }
                 }
               }
             } catch {

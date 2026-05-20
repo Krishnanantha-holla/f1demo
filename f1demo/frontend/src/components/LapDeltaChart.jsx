@@ -24,32 +24,37 @@ export default function LapDeltaChart({ driverData = {}, roster = [] }) {
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
-  const allLaps = drivers.flatMap((driver) => driverData[driver]);
-  const allTimes = allLaps.map((lap) => lap.LapTimeSeconds).filter((value) => Number.isFinite(value));
-  const maxLap = Math.max(1, ...allLaps.map((lap) => lap.LapNumber || 1));
-  const minT = allTimes.length ? Math.min(...allTimes) - 0.5 : 0;
-  const maxT = allTimes.length ? Math.max(...allTimes) + 0.5 : 1;
-  const paceRef = median(allTimes);
+  const { series, maxLap, minT, maxT, paceRef } = useMemo(() => {
+    const allLaps = drivers.flatMap((driver) => driverData[driver] || []);
+    const allTimes = allLaps.map((lap) => lap.LapTimeSeconds).filter((value) => Number.isFinite(value));
+    const maxLapInner = Math.max(1, ...allLaps.map((lap) => lap.LapNumber || 1));
+    const minTInner = allTimes.length ? Math.min(...allTimes) - 0.5 : 0;
+    const maxTInner = allTimes.length ? Math.max(...allTimes) + 0.5 : 1;
+    const pace = median(allTimes);
+
+    const xScaleInner = (lap) => PAD.left + ((Math.max(1, lap) - 1) / Math.max(1, maxLapInner - 1)) * innerW;
+    const yScaleInner = (seconds) => PAD.top + (1 - (seconds - minTInner) / Math.max(1e-9, maxTInner - minTInner)) * innerH;
+
+    const s = drivers.map((driver) => {
+      const laps = (driverData[driver] || []).filter((lap) => Number.isFinite(lap.LapTimeSeconds));
+      const points = laps.map((lap, index) => {
+        const x = xScaleInner(lap.LapNumber || index + 1);
+        const y = yScaleInner(lap.LapTimeSeconds);
+        return { ...lap, x, y };
+      });
+      const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
+      return { driver, laps: points, path };
+    });
+
+    return { series: s, maxLap: maxLapInner, minT: minTInner, maxT: maxTInner, paceRef: pace };
+  }, [driverData, drivers, innerW, innerH, PAD.left, PAD.top]);
 
   const xScale = (lap) => PAD.left + ((Math.max(1, lap) - 1) / Math.max(1, maxLap - 1)) * innerW;
   const yScale = (seconds) => PAD.top + (1 - (seconds - minT) / Math.max(1e-9, maxT - minT)) * innerH;
-
-  const series = useMemo(() => drivers.map((driver) => {
-    const laps = driverData[driver].filter((lap) => Number.isFinite(lap.LapTimeSeconds));
-    const points = laps.map((lap, index) => {
-      const x = xScale(lap.LapNumber || index + 1);
-      const y = yScale(lap.LapTimeSeconds);
-      return { ...lap, x, y };
-    });
-    const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
-    return { driver, laps: points, path };
-  }), [driverData, drivers]);
-
   const teamColor = (driverCode) => {
-    const driver = roster.find((entry) => entry.name_acronym === driverCode || entry.code === driverCode);
+    const driver = roster.find((entry) => entry.name_acronym === driverCode || entry.code === driverCode || String(entry.driver_number) === String(driverCode));
     return getTeamColor(driver?.team_name || driver?.team || '');
   };
-
   if (!drivers.length) return null;
 
   return (

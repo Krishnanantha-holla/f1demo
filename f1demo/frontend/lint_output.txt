@@ -1,0 +1,17 @@
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+/home/krishnanantha/f1demo/f1demo/frontend/src/pages/Analysis.jsx
+  339:48  error  'drivers' is defined but never used  no-unused-vars
+
+/home/krishnanantha/f1demo/f1demo/frontend/src/pages/Calendar.jsx
+  267:26  error  'e' is defined but never used  no-unused-vars
+  286:28  error  'e' is defined but never used  no-unused-vars
+
+/home/krishnanantha/f1demo/f1demo/frontend/src/pages/Dashboard.jsx
+  447:33  error  'drivers' is defined but never used  no-unused-vars
+
+✖ 4 problems (4 errors, 0 warnings)
+

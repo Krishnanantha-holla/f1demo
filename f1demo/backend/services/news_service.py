@@ -16,8 +16,14 @@ SOURCES = [
     {"url": "https://www.crash.net/rss/f1", "source": "Crash.net"},
     {"url": "https://www.gpfans.com/en/rss.xml", "source": "GPFans"},
     {"url": "https://www.skysports.com/rss/12821", "source": "Sky Sports F1"},
-    {"url": "https://feeds.bbci.co.uk/sport/formula1/rss.xml", "source": "BBC Sport F1"},
-    {"url": "https://www.formula1.com/content/fom-website/en/latest/all.xml", "source": "Formula1.com"},
+    {
+        "url": "https://feeds.bbci.co.uk/sport/formula1/rss.xml",
+        "source": "BBC Sport F1",
+    },
+    {
+        "url": "https://www.formula1.com/content/fom-website/en/latest/all.xml",
+        "source": "Formula1.com",
+    },
 ]
 
 
@@ -94,22 +100,32 @@ async def fetch_news(cache_lookup, cache_write, logger: logging.Logger):
             ) as client:
                 resp = await client.get(source["url"])
                 if resp.status_code != 200:
-                    logger.warning("Feed %s returned %s", source["source"], resp.status_code)
+                    logger.warning(
+                        "Feed %s returned %s", source["source"], resp.status_code
+                    )
                     return
 
                 feed = feedparser.parse(resp.content)
                 for entry in feed.entries[:10]:
                     summary = _extract_summary(entry)
-                    articles.append({
-                        "title": entry.title if hasattr(entry, "title") else "Untitled",
-                        "link": entry.link if hasattr(entry, "link") else "",
-                        "published": _extract_published(entry),
-                        "source": source["source"],
-                        "image": _extract_image(entry),
-                        "summary": summary[:300] if summary else "",
-                    })
+                    articles.append(
+                        {
+                            "title": entry.title
+                            if hasattr(entry, "title")
+                            else "Untitled",
+                            "link": entry.link if hasattr(entry, "link") else "",
+                            "published": _extract_published(entry),
+                            "source": source["source"],
+                            "image": _extract_image(entry),
+                            "summary": summary[:300] if summary else "",
+                        }
+                    )
 
-                logger.info("Fetched %d articles from %s", len(feed.entries[:10]), source["source"])
+                logger.info(
+                    "Fetched %d articles from %s",
+                    len(feed.entries[:10]),
+                    source["source"],
+                )
         except Exception as exc:
             logger.warning("Failed to fetch feed %s: %s", source["source"], exc)
 
@@ -119,7 +135,9 @@ async def fetch_news(cache_lookup, cache_write, logger: logging.Logger):
         logger.warning("No articles fetched from any source")
         return []
 
-    articles.sort(key=lambda article: _parse_date(article.get("published", "")), reverse=True)
+    articles.sort(
+        key=lambda article: _parse_date(article.get("published", "")), reverse=True
+    )
 
     seen_titles = set()
     unique_articles = []

@@ -47,12 +47,18 @@ def event_session_windows(row) -> list[dict]:
                 break
 
         duration_hours = 4 if session_name in {"Race", "Sprint"} else 2
-        end = next_start if next_start and next_start > start else start + timedelta(hours=duration_hours)
-        windows.append({
-            "name": session_name,
-            "start": start,
-            "end": end,
-        })
+        end = (
+            next_start
+            if next_start and next_start > start
+            else start + timedelta(hours=duration_hours)
+        )
+        windows.append(
+            {
+                "name": session_name,
+                "start": start,
+                "end": end,
+            }
+        )
     return windows
 
 
@@ -99,7 +105,12 @@ def build_free_context(
         if first_session and first_session > now and context["next_event"] is None:
             context["next_event"] = serialize_event_row(row)
 
-        if first_session and event_end and first_session <= now <= event_end and context["current_event"] is None:
+        if (
+            first_session
+            and event_end
+            and first_session <= now <= event_end
+            and context["current_event"] is None
+        ):
             context["current_event"] = serialize_event_row(row)
 
         for window in event_session_windows(row):

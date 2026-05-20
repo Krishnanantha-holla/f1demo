@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getTeamColor } from '../api';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useF1Store } from '../store/useF1Store';
+import { FlipValue } from './Shared';
 
 const FLAG_COLORS = {
   RED: '#e10600',
@@ -80,7 +81,8 @@ export default function LiveCompanion() {
     );
     if (!isImportant) return;
 
-    setActiveAlert(latest);
+    // Defer setting state to avoid synchronous setState within effect
+    setTimeout(() => setActiveAlert(latest), 0);
     clearTimeout(alertTimer.current);
     alertTimer.current = setTimeout(() => setActiveAlert(null), 12000);
   }, [liveData]);
@@ -106,14 +108,25 @@ export default function LiveCompanion() {
 
   return (
     <div className={`live-companion-v2 ${minimized ? 'lc-minimized' : ''}`}>
+      {/* Off-screen live status announcement */}
+      <span className="sr-only" aria-live="polite">
+        {isLive ? `${sessionName} is live.` : ''}
+      </span>
+
       {/* Alert banner */}
       {activeAlert && (
-        <div className="lc-alert" style={{ '--alert-color': alertColor }}>
+        <div
+          className="lc-alert"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          style={{ '--alert-color': alertColor }}
+        >
           <span className="lc-alert-flag" style={{ color: alertColor }}>
             {activeAlert.flag === 'RED' ? '🚨' : activeAlert.flag === 'YELLOW' ? '⚠️' : '🚗'}
           </span>
           <span className="lc-alert-msg">{activeAlert.message}</span>
-          <button className="lc-alert-close" onClick={() => setActiveAlert(null)}>✕</button>
+          <button className="lc-alert-close" onClick={() => setActiveAlert(null)} aria-label="Dismiss alert">✕</button>
         </div>
       )}
 
@@ -142,7 +155,7 @@ export default function LiveCompanion() {
           {sorted.length === 0 ? (
             <div className="lc-waiting">Waiting for timing data…</div>
           ) : (
-            <div className="lc-tower">
+            <div className="lc-tower" role="region" aria-label="Live timing tower" aria-live="off">
               {sorted.map((p, idx) => {
                 const d = driverMap[p.driver_number];
                 const iv = intervalMap[p.driver_number];
@@ -163,9 +176,10 @@ export default function LiveCompanion() {
                     <span className="lc-acronym">{acronym}</span>
                     <span className="lc-team">{d?.team_name?.split(' ')[0] || ''}</span>
                     {gap && (
-                      <span className="lc-gap" style={{ color: gap === 'LEADER' ? '#00d26a' : 'var(--text-muted)' }}>
-                        {gap}
-                      </span>
+                      <FlipValue
+                        className="lc-gap"
+                        value={gap}
+                      />
                     )}
                   </div>
                 );

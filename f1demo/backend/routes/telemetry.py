@@ -1,14 +1,18 @@
 """FastF1 telemetry and lap data endpoints."""
+
 import asyncio
 
 from fastapi import APIRouter, Request, Query, HTTPException
 
-from utils import logger, HAS_FASTF1, fastf1, cached_get
+from limiter import limiter
+from utils import logger, HAS_FASTF1, fastf1
+from services.downsample import lttb_records
 
 router = APIRouter()
 
 
 @router.get("/laps/{year}/{event}/{session_type}")
+@limiter.limit("60/minute")
 async def get_laps(
     request: Request,
     year: int,
@@ -21,16 +25,28 @@ async def get_laps(
     if not HAS_FASTF1:
         raise HTTPException(status_code=503, detail="FastF1 not installed")
     if year < 2018 or year > 2030:
-        raise HTTPException(status_code=400, detail="year must be between 2018 and 2030")
+        raise HTTPException(
+            status_code=400, detail="year must be between 2018 and 2030"
+        )
     if session_type not in ("R", "Q", "FP1", "FP2", "FP3", "SQ", "SR", "S"):
         raise HTTPException(status_code=400, detail="invalid session_type")
-    
+
     def _get_laps():
         s = fastf1.get_session(year, event, session_type)
         s.load(telemetry=False, weather=False)
         laps = s.laps[
-            ["Driver", "LapNumber", "LapTime", "Compound", "IsPersonalBest",
-             "Sector1Time", "Sector2Time", "Sector3Time", "Stint", "Position"]
+            [
+                "Driver",
+                "LapNumber",
+                "LapTime",
+                "Compound",
+                "IsPersonalBest",
+                "Sector1Time",
+                "Sector2Time",
+                "Sector3Time",
+                "Stint",
+                "Position",
+            ]
         ].dropna(subset=["LapTime"])
         laps["LapTimeSeconds"] = laps["LapTime"].dt.total_seconds()
         laps["Sector1Seconds"] = laps["Sector1Time"].dt.total_seconds()
@@ -46,15 +62,22 @@ async def get_laps(
             "page_size": page_size,
             "pages": max(1, (total + page_size - 1) // page_size),
         }
-    
+
     try:
         return await asyncio.to_thread(_get_laps)
     except Exception as e:
-        logger.error("get_laps error year=%s event=%s session=%s: %s", year, event, session_type, e)
+        logger.error(
+            "get_laps error year=%s event=%s session=%s: %s",
+            year,
+            event,
+            session_type,
+            e,
+        )
         raise HTTPException(status_code=500, detail="Failed to fetch laps")
 
 
 @router.get("/telemetry/{year}/{event}/{session_type}/{driver}")
+@limiter.limit("60/minute")
 async def get_telemetry(
     request: Request,
     year: int,
@@ -66,12 +89,14 @@ async def get_telemetry(
     if not HAS_FASTF1:
         raise HTTPException(status_code=503, detail="FastF1 not installed")
     if year < 2018 or year > 2030:
-        raise HTTPException(status_code=400, detail="year must be between 2018 and 2030")
+        raise HTTPException(
+            status_code=400, detail="year must be between 2018 and 2030"
+        )
     if session_type not in ("R", "Q", "FP1", "FP2", "FP3", "SQ", "SR", "S"):
         raise HTTPException(status_code=400, detail="invalid session_type")
     if not driver.isalpha() or not (2 <= len(driver) <= 4):
         raise HTTPException(status_code=400, detail="driver must be a 2-4 letter code")
-    
+
     def _get_telemetry():
         s = fastf1.get_session(year, event, session_type)
         s.load()
@@ -79,18 +104,44 @@ async def get_telemetry(
         if fastest is None or fastest.get_car_data() is None:
             return []
         tel = fastest.get_car_data().reset_index(drop=True)
+        # Initial coarse sample (every 5th row) keeps the in-thread workload bounded.
         sampled = tel.iloc[::5]
-        return sampled.to_dict(orient="records")
-    
+        records = sampled.to_dict(orient="records")
+        # Normalise the time axis to a numeric key LTTB can sort on.
+        for idx, rec in enumerate(records):
+            t = rec.get("Time")
+            if hasattr(t, "total_seconds"):
+                rec["TimeSeconds"] = float(t.total_seconds())
+            elif t is not None:
+                try:
+                    rec["TimeSeconds"] = float(t)
+                except (TypeError, ValueError):
+                    rec["TimeSeconds"] = float(idx)
+            else:
+                rec["TimeSeconds"] = float(idx)
+        # LTTB cap so the wire payload stays manageable for the chart.
+        if len(records) > 2000:
+            records = lttb_records(records, "TimeSeconds", "Speed", 2000)
+        return records
+
     try:
         return await asyncio.to_thread(_get_telemetry)
     except Exception as e:
-        logger.error("get_telemetry error year=%s event=%s session=%s driver=%s: %s", year, event, session_type, driver, e)
+        logger.error(
+            "get_telemetry error year=%s event=%s session=%s driver=%s: %s",
+            year,
+            event,
+            session_type,
+            driver,
+            e,
+        )
         raise HTTPException(status_code=500, detail="Failed to fetch telemetry")
 
 
 @router.get("/compare")
+@limiter.limit("60/minute")
 async def compare_drivers(
+    request: Request,
     year: int,
     event: str,
     session_type: str,
@@ -102,7 +153,7 @@ async def compare_drivers(
     driver_list = [d.strip().upper() for d in drivers.split(",") if d.strip()]
     if not (2 <= len(driver_list) <= 5):
         raise HTTPException(status_code=400, detail="Provide 2-5 driver codes")
-    
+
     def _compare():
         s = fastf1.get_session(year, event, session_type)
         s.load(telemetry=False, weather=False)
@@ -110,16 +161,35 @@ async def compare_drivers(
         for drv in driver_list:
             try:
                 laps = s.laps.pick_driver(drv)[
-                    ["LapNumber", "LapTime", "Compound", "IsPersonalBest", "S1", "S2", "S3", "Stint"]
+                    [
+                        "LapNumber",
+                        "LapTime",
+                        "Compound",
+                        "IsPersonalBest",
+                        "S1",
+                        "S2",
+                        "S3",
+                        "Stint",
+                    ]
                 ]
                 laps["LapTimeSeconds"] = laps["LapTime"].dt.total_seconds()
-                result[drv] = laps[["LapNumber", "LapTimeSeconds", "Compound",
-                                     "IsPersonalBest", "S1", "S2", "S3", "Stint"]].to_dict(orient="records")
+                result[drv] = laps[
+                    [
+                        "LapNumber",
+                        "LapTimeSeconds",
+                        "Compound",
+                        "IsPersonalBest",
+                        "S1",
+                        "S2",
+                        "S3",
+                        "Stint",
+                    ]
+                ].to_dict(orient="records")
             except Exception as exc:
                 logger.error("compare driver %s error: %s", drv, exc)
                 result[drv] = []
         return result
-    
+
     try:
         return await asyncio.to_thread(_compare)
     except Exception as exc:

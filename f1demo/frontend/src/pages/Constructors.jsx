@@ -51,10 +51,7 @@ function getCarImageCandidates(teamName) {
   return [...new Set(urls)];
 }
 
-function getCarImage(teamName) {
-  const candidates = getCarImageCandidates(teamName);
-  return candidates[0] || null;
-}
+
 
 function advanceCarFallback(e, candidates) {
   if (!candidates || candidates.length === 0) {
@@ -103,9 +100,9 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
   const [detail, setDetail] = useState(null);
   const [driverLapData, setDriverLapData] = useState({});
   const [closing, setClosing] = useState(false);
-  
+
   const color = getTeamColor(team.team_name);
-  
+
   // Try to find the constructor key in bios
   let info = {};
   if (bios) {
@@ -185,7 +182,7 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
       <div className={`encyclopedia-backdrop ${closing ? 'closing' : ''}`} onClick={handleClose} />
       <div className={`encyclopedia-panel ${closing ? 'closing' : ''}`}>
         <button className="panel-close" onClick={handleClose}>✕</button>
-        
+
         {/* Massive watermark */}
         <div className="watermark-number">P{team.position_current}</div>
 
@@ -278,14 +275,14 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
                   <div className="h2h-driver" style={{ color: color }}>{d1.full_name}</div>
                   <div className="h2h-vs">VS</div>
                   <div className="h2h-driver" style={{ textAlign: 'right' }}>{d2.full_name}</div>
-                  
+
                   <div className="h2h-stat" style={{ color: color }}>{ds1.points_current || 0} pts</div>
                   <div className="h2h-stat-label">Points</div>
                   <div className="h2h-stat" style={{ textAlign: 'right' }}>{ds2.points_current || 0} pts</div>
                 </div>
                 <div className="h2h-bar-container" style={{ marginTop: '0.5rem' }}>
-                  <div 
-                    className="h2h-bar" 
+                  <div
+                    className="h2h-bar"
                     style={{ background: color, width: `${(ds1.points_current || 0) / (((ds1.points_current || 0) + (ds2.points_current || 0)) || 1) * 100}%` }}
                   />
                 </div>
@@ -439,9 +436,9 @@ export default function Constructors() {
               style={{ animationDelay: `${Math.min(i * 30, 400)}ms` }}
             >
               <div className="pilot-card-bg" style={{ background: `linear-gradient(135deg, ${color}15 0%, transparent 60%)` }} />
-              
+
               <div className="pilot-num-bg">P{team.position_current || '?'}</div>
-              
+
               <div className="pilot-card-top">
                 <div className="pilot-card-info" style={{ zIndex: 2 }}>
                   <div className="pilot-name">{team.team_name || 'Grid Team'}</div>
@@ -469,13 +466,13 @@ export default function Constructors() {
                     <span className="pr-pts" style={{ color: color }}>{points} PTS</span>
                   </div>
                   <div className="points-bar-track" style={{ width: '100%', height: '4px' }}>
-                    <div 
-                      className="points-bar-fill" 
-                      style={{ 
-                        background: color, 
+                    <div
+                      className="points-bar-fill"
+                      style={{
+                        background: color,
                         '--fill': barWidth,
                         '--bar-delay': `${Math.min(i * 40, 600)}ms`
-                      }} 
+                      }}
                     />
                   </div>
                 </div>

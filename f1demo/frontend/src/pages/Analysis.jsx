@@ -1,38 +1,11 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
 import { api, getTeamColor } from '../api';
 import { Loading, ErrorMsg } from '../components/Shared';
 import SessionSelector from '../components/SessionSelector';
 import LapDeltaChart from '../components/LapDeltaChart';
 import PaceStrip from '../components/PaceStrip';
 import { useF1Store } from '../store/useF1Store';
-
-function getCurrentYear() {
-  return new Date().getFullYear();
-}
-const SESSION_TYPES = ['R', 'Q', 'FP1', 'FP2', 'FP3', 'SQ', 'SR', 'S'];
-const COMPOUND_COLORS = {
-  SOFT: '#e10600', MEDIUM: '#f5c623', HARD: '#e8e8ee',
-  INTERMEDIATE: '#45b649', WET: '#2d6dd1', UNKNOWN: '#888',
-};
-
-const SESSION_NAME_TO_CODE = {
-  'Race': 'R',
-  'Qualifying': 'Q',
-  'Sprint': 'S',
-  'Sprint Qualifying': 'SQ',
-  'Sprint Shootout': 'SQ',
-  'Practice 1': 'FP1',
-  'Practice 2': 'FP2',
-  'Practice 3': 'FP3',
-};
-
-function fmtTime(s) {
-  if (s == null || typeof s !== 'number') return '—';
-  const m = Math.floor(s / 60);
-  const sec = (s % 60).toFixed(3);
-  return m > 0 ? `${m}:${sec.padStart(6, '0')}` : sec;
-}
+import { getCurrentYear, SESSION_TYPES, COMPOUND_COLORS, SESSION_NAME_TO_CODE, fmtTime } from './analysis/utils';
 
 // ═══════════════════════════════════════
 // CHART 1: LAP TIMES
@@ -337,7 +310,7 @@ function SpeedTraceChart({ telData, colors, drivers }) {
 // ═══════════════════════════════════════
 // CHART 6: THROTTLE + BRAKE
 // ═══════════════════════════════════════
-function ThrottleBrakeChart({ telData, colors, drivers }) {
+function ThrottleBrakeChart({ telData, colors }) {
   if (!telData.length) return null;
   const W = 820, H = 200, pad = { t: 15, r: 30, b: 35, l: 55 };
   const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
@@ -478,11 +451,11 @@ function ChartSkeleton() {
 // MAIN ANALYSIS PAGE
 // ═══════════════════════════════════════
 export default function Analysis() {
-  const [searchParams] = useSearchParams();
+
   const roster = useF1Store((state) => state.driverRoster);
 
   const currentYear = useMemo(() => getCurrentYear(), []);
-  const years = useMemo(() => 
+  const years = useMemo(() =>
     Array.from({ length: currentYear - 2017 }, (_, i) => currentYear - i),
     [currentYear]
   );
@@ -506,12 +479,14 @@ export default function Analysis() {
 
   // Load events when year changes
   useEffect(() => {
-    setEvents([]);
-    setSelectedEvent('');
-    setAvailableDrivers([]);
-    setSelectedDrivers([]);
-    setLapData([]);
-    setTelData([]);
+    const id = setTimeout(() => {
+      setEvents([]);
+      setSelectedEvent('');
+      setAvailableDrivers([]);
+      setSelectedDrivers([]);
+      setLapData([]);
+      setTelData([]);
+    }, 0);
 
     // Try TracingInsights first for event list
     api.tiEvents(year)
@@ -531,15 +506,18 @@ export default function Analysis() {
           })
           .catch(() => {});
       });
+    return () => clearTimeout(id);
   }, [year]);
 
   // Load drivers when event changes
   useEffect(() => {
     if (!selectedEvent) return;
-    setAvailableDrivers([]);
-    setSelectedDrivers([]);
-    setLapData([]);
-    setTelData([]);
+    const id = setTimeout(() => {
+      setAvailableDrivers([]);
+      setSelectedDrivers([]);
+      setLapData([]);
+      setTelData([]);
+    }, 0);
 
     api.tiSessions(year, selectedEvent)
       .then(sessions => {
@@ -562,6 +540,7 @@ export default function Analysis() {
       .catch((e) => {
         console.error('Failed to load drivers', e);
       });
+    return () => clearTimeout(id);
   }, [selectedEvent, year, sessionType]);
 
   // Load data
@@ -646,12 +625,12 @@ export default function Analysis() {
 
   useEffect(() => {
     if (!selectedEvent || selectedDrivers.length < 2) {
-      setCompareData({});
-      return;
+      const id = setTimeout(() => setCompareData({}), 0);
+      return () => clearTimeout(id);
     }
 
     let cancelled = false;
-    setCompareLoading(true);
+    const loadId = setTimeout(() => setCompareLoading(true), 0);
     api.compareDrivers(year, selectedEvent, sessionType, selectedDrivers.slice(0, 5))
       .then((data) => {
         if (!cancelled) setCompareData(data || {});
@@ -665,6 +644,7 @@ export default function Analysis() {
 
     return () => {
       cancelled = true;
+      clearTimeout(loadId);
     };
   }, [year, selectedEvent, sessionType, selectedDrivers]);
 
