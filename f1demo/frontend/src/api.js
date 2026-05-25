@@ -89,6 +89,25 @@ async function get(path, { query, retries = DEFAULT_RETRIES, timeoutMs = REQUEST
   throw lastError || new ApiError('Unknown API failure', { url });
 }
 
+
+async function post(path, body, { timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  const url = `${API}${path}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body), signal: controller.signal,
+    });
+    const data = await parseResponseBody(res);
+    if (!res.ok) throw new ApiError(data?.detail || `API error: ${res.status}`, { status: res.status, url });
+    return data;
+  } catch (err) {
+    if (err?.name === 'AbortError') throw new ApiError(`Request timed out`, { url });
+    throw err;
+  } finally { clearTimeout(timeout); }
+}
+
 export const api = {
   // Health
   health:       ()  => get('/health'),
@@ -153,6 +172,38 @@ export const api = {
   // Encyclopedia & News
   news:         () => get('/news'),
   bios:         () => get('/bios'),
+
+  // Head-to-Head
+  headToHead:   (driver1, driver2, year) => get('/head-to-head', { query: { driver1, driver2, year } }),
+
+  // Driver Stats
+  driverStats:  (driver, year) => get('/driver-stats', { query: { driver, year } }),
+
+  // Race Pace
+  racePace:     (year, round) => get('/race-pace', { query: { year, round } }),
+
+  // Pit Stops
+  pitStops:     (year, round) => get('/pit-stops', { query: { year, round } }),
+
+  // PU Elements
+  puElements:   (year) => get('/pu-elements', { query: { year } }),
+
+  // Results Archive
+  resultsArchive: (year, round, session) => get('/results/archive', { query: { year, round, session } }),
+
+  // Track DNA
+  trackDna:     (circuit_id) => get('/track-dna', { query: { circuit_id } }),
+
+  // Consistency
+  consistency:  (year) => get('/consistency', { query: { year } }),
+
+  // Live Track Map
+  liveTrackMap: (session_key) => get('/live-track-map', { query: { session_key } }),
+
+  // AI (Grok)
+  aiAnalyze:  (topic, context) => post('/ai/analyze', { topic, context }),
+  aiChat:     (messages) => post('/ai/chat', { messages }),
+  aiSummary:  (subjectType, subjectId) => get(`/ai/summary/${subjectType}/${encodeURIComponent(subjectId)}`),
 };
 
 // Team color config — add new teams here ONLY

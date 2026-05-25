@@ -69,6 +69,21 @@ from routes.live import router as live_router, ws_router
 from routes.live_sse import router as live_sse_router
 from routes.ti import router as ti_router
 from routes.misc import router as misc_router, internal_router
+from routes.head_to_head import router as head_to_head_router
+from routes.strategy import router as strategy_router
+from routes.mini_sectors import router as mini_sectors_router
+from routes.team_radio import router as team_radio_router
+from routes.tyre_deg import router as tyre_deg_router
+from routes.overtake import router as overtake_router
+from routes.results import router as results_router
+from routes.track_dna import router as track_dna_router
+from routes.consistency import router as consistency_router
+from routes.driver_stats import router as driver_stats_router
+from routes.race_pace import router as race_pace_router
+from routes.pit_stops import router as pit_stops_router
+from routes.pu_tracker import router as pu_tracker_router
+from routes.live_track_map import router as live_track_map_router
+from routes.ai import router as ai_router
 
 app.include_router(health_router, prefix="/api", tags=["Health"])
 app.include_router(schedule_router, prefix="/api", tags=["Schedule & Standings"])
@@ -77,6 +92,21 @@ app.include_router(live_sse_router, prefix="/api", tags=["Live"])
 app.include_router(live_router, prefix="/api", tags=["Live"])
 app.include_router(ti_router, prefix="/api", tags=["TracingInsights"])
 app.include_router(misc_router, prefix="/api", tags=["Misc"])
+app.include_router(head_to_head_router, prefix="/api", tags=["Head To Head"])
+app.include_router(strategy_router, prefix="/api", tags=["Strategy"])
+app.include_router(mini_sectors_router, prefix="/api", tags=["Mini Sectors"])
+app.include_router(team_radio_router, prefix="/api", tags=["Team Radio"])
+app.include_router(tyre_deg_router, prefix="/api", tags=["Tyre Degradation"])
+app.include_router(overtake_router, prefix="/api", tags=["Overtake"])
+app.include_router(results_router, prefix="/api", tags=["Results Benchmark"])
+app.include_router(track_dna_router, prefix="/api", tags=["Track DNA"])
+app.include_router(consistency_router, prefix="/api", tags=["Consistency Analyzer"])
+app.include_router(driver_stats_router, prefix="/api", tags=["Driver Stats"])
+app.include_router(race_pace_router, prefix="/api", tags=["Race Pace"])
+app.include_router(pit_stops_router, prefix="/api", tags=["Pit Stops"])
+app.include_router(pu_tracker_router, prefix="/api", tags=["PU Tracker"])
+app.include_router(live_track_map_router, prefix="/api", tags=["Live Track Map"])
+app.include_router(ai_router, prefix="/api", tags=["AI"])
 app.include_router(ws_router, tags=["WebSocket"])  # No /api prefix for WebSocket
 app.include_router(
     internal_router, tags=["Internal"]

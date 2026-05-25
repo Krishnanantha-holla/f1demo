@@ -1,9 +1,124 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Light theme — opt-in via <html data-theme="light">.
+   Toggle via the Settings page. The default (no attribute) stays dark.
+
+   Strategy:
+   - Override only the surface/text/border tokens; team colors stay constant
+     so brand identity survives across themes.
+   - Re-tint the dotted body background and the sidebar scroll fades so they
+     read on a light surface (the dark-mode values were near-black).
+   - Lower the F1 logo glow opacity — full intensity feels harsh on light.
+   ───────────────────────────────────────────────────────────────────── */
+
 :root[data-theme='light'] {
-  --bg-darkest: #f7f7fa;
-  --bg-dark: #ededf4;
-  --bg-card: rgba(255, 255, 255, 0.9);
-  --bg-card-glass: rgba(255, 255, 255, 0.75);
-  --text: #17171c;
-  --text-muted: #5b5b66;
-  --border: rgba(10, 10, 20, 0.12);
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg-darkest: #f5f5f8;
+  --bg-dark: #eaeaef;
+  --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.92);
+  --card-bg: #ffffff;
+
+  /* Text — dark charcoal for WCAG AA on white */
+  --text: #111216;
+  --text-primary: #111216;
+  --text-muted: #3a3a44;
+  --text-dim: #5a5a66;
+
+  /* Lines — faint gray */
+  --border: rgba(10, 10, 20, 0.15);
+  --border-glow: rgba(255, 30, 0, 0.15);
+
+  /* Brand glow tuned for light surface */
+  --f1-red-glow: rgba(255, 30, 0, 0.18);
+
+  /* Status hues — darker for AA contrast on white cards */
+  --green: #047857;
+  --yellow: #92400e;
+  --orange: #c2410c;
+  --cyan: #0e7490;
+  --purple: #6d28d9;
+  --accent: #e10600;
+}
+
+/* Body dotted radial background — flip to light gray dots on near-white */
+:root[data-theme='light'] body::before {
+  background-image: radial-gradient(rgba(10, 10, 20, 0.06) 1px, transparent 1px);
+}
+
+/* Sidebar scroll fades — match the new bg-dark */
+:root[data-theme='light'] .sidebar-scroll-fade.top {
+  background: linear-gradient(180deg, rgba(247, 247, 250, 0.95), rgba(247, 247, 250, 0));
+}
+:root[data-theme='light'] .sidebar-scroll-fade.bottom {
+  background: linear-gradient(0deg, rgba(247, 247, 250, 0.95), rgba(247, 247, 250, 0));
+}
+
+/* F1 logo glow softer on light */
+:root[data-theme='light'] .sidebar-logo {
+  text-shadow: 0 0 12px rgba(225, 6, 0, 0.28);
+}
+
+/* Toast surface needs a bit more contrast on white */
+:root[data-theme='light'] .toast {
+  box-shadow: 0 12px 30px rgba(10, 10, 20, 0.18);
+}
+:root[data-theme='light'] .toast-error {
+  box-shadow: 0 12px 30px rgba(255, 30, 0, 0.18);
+}
+
+/* Selection color tuned for light surface */
+:root[data-theme='light'] ::selection {
+  background: rgba(255, 30, 0, 0.18);
+  color: var(--text);
+}
+
+/* Skeleton shimmer is barely visible on white — bump the gradient stops */
+:root[data-theme='light'] .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(10, 10, 20, 0.04) 0%,
+    rgba(10, 10, 20, 0.10) 50%,
+    rgba(10, 10, 20, 0.04) 100%
+  );
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────
+   System preference fallback — when no data-theme attribute is set
+   (the "system" choice in Settings), honor the OS-level preference.
+   Wrapped so explicit dark or light still wins.
+   ───────────────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg-darkest: #f5f5f8;
+    --bg-dark: #eaeaef;
+    --bg-card: #ffffff;
+    --bg-card-glass: rgba(255, 255, 255, 0.92);
+    --card-bg: #ffffff;
+    --text: #111216;
+    --text-primary: #111216;
+    --text-muted: #3a3a44;
+    --text-dim: #5a5a66;
+    --border: rgba(10, 10, 20, 0.15);
+    --border-glow: rgba(255, 30, 0, 0.15);
+    --f1-red-glow: rgba(255, 30, 0, 0.18);
+    --green: #047857;
+    --yellow: #92400e;
+    --orange: #c2410c;
+    --cyan: #0e7490;
+    --purple: #6d28d9;
+    --accent: #e10600;
+  }
+  :root:not([data-theme]) body::before {
+    background-image: radial-gradient(rgba(10, 10, 20, 0.06) 1px, transparent 1px);
+  }
+  :root:not([data-theme]) .sidebar-scroll-fade.top {
+    background: linear-gradient(180deg, rgba(247, 247, 250, 0.95), rgba(247, 247, 250, 0));
+  }
+  :root:not([data-theme]) .sidebar-scroll-fade.bottom {
+    background: linear-gradient(0deg, rgba(247, 247, 250, 0.95), rgba(247, 247, 250, 0));
+  }
 }

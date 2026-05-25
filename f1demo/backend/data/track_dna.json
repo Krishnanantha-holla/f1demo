@@ -1,0 +1,102 @@
+{
+  "bahrain": {
+    "circuit_id": "bahrain", "name": "Bahrain International Circuit", "country": "Bahrain",
+    "length_km": 5.412, "laps": 57,
+    "lap_record": {"time": "1:31.447", "driver": "Pedro de la Rosa", "year": 2005},
+    "corners": [{"number": 1, "type": "heavy_braking", "speed": "low", "overtaking": true}, {"number": 4, "type": "hairpin", "speed": "low", "overtaking": true}, {"number": 10, "type": "medium_speed", "speed": "medium", "overtaking": false}, {"number": 14, "type": "chicane", "speed": "low", "overtaking": true}],
+    "drs_zones": 3, "downforce_level": "medium", "tire_wear": "high", "braking_severity": "high",
+    "track_evolution": "high", "surface_type": "abrasive",
+    "key_overtaking_spots": ["Turn 1 braking zone", "Turn 4 hairpin", "Turn 11 DRS zone"],
+    "tire_recommendation": "Hard/Medium preferred due to high degradation"
+  },
+  "jeddah": {
+    "circuit_id": "jeddah", "name": "Jeddah Corniche Circuit", "country": "Saudi Arabia",
+    "length_km": 6.174, "laps": 50,
+    "lap_record": {"time": "1:30.734", "driver": "Lewis Hamilton", "year": 2021},
+    "corners": [{"number": 1, "type": "fast_kink", "speed": "high", "overtaking": false}, {"number": 13, "type": "chicane", "speed": "medium", "overtaking": true}, {"number": 27, "type": "hairpin", "speed": "low", "overtaking": true}],
+    "drs_zones": 3, "downforce_level": "low", "tire_wear": "low", "braking_severity": "low",
+    "track_evolution": "high", "surface_type": "smooth",
+    "key_overtaking_spots": ["Turn 1 braking", "Turn 27 hairpin", "Back straight"],
+    "tire_recommendation": "Soft/Medium viable due to low degradation"
+  },
+  "melbourne": {
+    "circuit_id": "melbourne", "name": "Albert Park Circuit", "country": "Australia",
+    "length_km": 5.278, "laps": 58,
+    "lap_record": {"time": "1:19.813", "driver": "Charles Leclerc", "year": 2024},
+    "corners": [{"number": 1, "type": "medium_speed", "speed": "medium", "overtaking": true}, {"number": 3, "type": "chicane", "speed": "low", "overtaking": true}, {"number": 11, "type": "fast_kink", "speed": "high", "overtaking": false}],
+    "drs_zones": 4, "downforce_level": "medium", "tire_wear": "medium", "braking_severity": "medium",
+    "track_evolution": "high", "surface_type": "smooth",
+    "key_overtaking_spots": ["Turn 1", "Turn 3 chicane", "DRS zone into Turn 11"],
+    "tire_recommendation": "Medium/Hard for race, Soft for qualifying"
+  },
+  "suzuka": {
+    "circuit_id": "suzuka", "name": "Suzuka International Racing Course", "country": "Japan",
+    "length_km": 5.807, "laps": 53,
+    "lap_record": {"time": "1:30.983", "driver": "Lewis Hamilton", "year": 2019},
+    "corners": [{"number": 1, "type": "fast_esses", "speed": "high", "overtaking": false}, {"number": 11, "type": "hairpin", "speed": "low", "overtaking": true}, {"number": 15, "type": "fast_chicane", "speed": "high", "overtaking": false}],
+    "drs_zones": 2, "downforce_level": "high", "tire_wear": "high", "braking_severity": "medium",
+    "track_evolution": "medium", "surface_type": "smooth",
+    "key_overtaking_spots": ["Turn 1 braking zone", "Hairpin", "130R exit into chicane"],
+    "tire_recommendation": "Medium/Hard due to high-speed corner wear"
+  },
+  "monaco": {
+    "circuit_id": "monaco", "name": "Circuit de Monaco", "country": "Monaco",
+    "length_km": 3.337, "laps": 78,
+    "lap_record": {"time": "1:12.909", "driver": "Lewis Hamilton", "year": 2021},
+    "corners": [{"number": 1, "type": "hairpin", "speed": "low", "overtaking": false}, {"number": 5, "type": "chicane", "speed": "low", "overtaking": false}, {"number": 10, "type": "tunnel", "speed": "high", "overtaking": false}],
+    "drs_zones": 1, "downforce_level": "maximum", "tire_wear": "low", "braking_severity": "high",
+    "track_evolution": "high", "surface_type": "street",
+    "key_overtaking_spots": ["Turn 1 Sainte Devote", "Chicane after tunnel"],
+    "tire_recommendation": "Soft/Medium - low degradation, track position critical"
+  },
+  "silverstone": {
+    "circuit_id": "silverstone", "name": "Silverstone Circuit", "country": "United Kingdom",
+    "length_km": 5.891, "laps": 52,
+    "lap_record": {"time": "1:27.097", "driver": "Max Verstappen", "year": 2020},
+    "corners": [{"number": 3, "type": "fast_complex", "speed": "high", "overtaking": false}, {"number": 6, "type": "heavy_braking", "speed": "low", "overtaking": true}, {"number": 9, "type": "fast_esses", "speed": "high", "overtaking": false}],
+    "drs_zones": 2, "downforce_level": "high", "tire_wear": "high", "braking_severity": "medium",
+    "track_evolution": "medium", "surface_type": "smooth",
+    "key_overtaking_spots": ["Brooklands/Luffield", "Wellington Straight into Brooklands", "Hangar Straight into Stowe"],
+    "tire_recommendation": "Hard/Medium due to high-speed lateral loads"
+  },
+  "spa": {
+    "circuit_id": "spa", "name": "Circuit de Spa-Francorchamps", "country": "Belgium",
+    "length_km": 7.004, "laps": 44,
+    "lap_record": {"time": "1:46.286", "driver": "Valtteri Bottas", "year": 2018},
+    "corners": [{"number": 1, "type": "hairpin", "speed": "low", "overtaking": true}, {"number": 5, "type": "fast_complex", "speed": "high", "overtaking": false}, {"number": 19, "type": "chicane", "speed": "low", "overtaking": true}],
+    "drs_zones": 2, "downforce_level": "low", "tire_wear": "medium", "braking_severity": "medium",
+    "track_evolution": "low", "surface_type": "smooth",
+    "key_overtaking_spots": ["La Source hairpin", "Kemmel Straight", "Bus Stop chicane"],
+    "tire_recommendation": "Medium/Hard - long lap favors harder compounds"
+  },
+  "monza": {
+    "circuit_id": "monza", "name": "Autodromo Nazionale Monza", "country": "Italy",
+    "length_km": 5.793, "laps": 53,
+    "lap_record": {"time": "1:21.046", "driver": "Rubens Barrichello", "year": 2004},
+    "corners": [{"number": 1, "type": "heavy_braking", "speed": "low", "overtaking": true}, {"number": 4, "type": "chicane", "speed": "low", "overtaking": true}, {"number": 8, "type": "fast_curve", "speed": "high", "overtaking": false}],
+    "drs_zones": 2, "downforce_level": "minimum", "tire_wear": "low", "braking_severity": "high",
+    "track_evolution": "low", "surface_type": "smooth",
+    "key_overtaking_spots": ["Turn 1 chicane", "Turn 4 Variante della Roggia", "Curva Grande exit"],
+    "tire_recommendation": "Soft/Medium - low lateral load, heavy braking"
+  },
+  "singapore": {
+    "circuit_id": "singapore", "name": "Marina Bay Street Circuit", "country": "Singapore",
+    "length_km": 4.940, "laps": 62,
+    "lap_record": {"time": "1:35.867", "driver": "Lewis Hamilton", "year": 2023},
+    "corners": [{"number": 1, "type": "heavy_braking", "speed": "low", "overtaking": true}, {"number": 5, "type": "chicane", "speed": "low", "overtaking": false}, {"number": 14, "type": "hairpin", "speed": "low", "overtaking": true}],
+    "drs_zones": 3, "downforce_level": "high", "tire_wear": "medium", "braking_severity": "high",
+    "track_evolution": "high", "surface_type": "street",
+    "key_overtaking_spots": ["Turn 1", "Turn 5 chicane", "Turn 14 hairpin"],
+    "tire_recommendation": "Medium/Hard - bumpy surface increases degradation"
+  },
+  "interlagos": {
+    "circuit_id": "interlagos", "name": "Autódromo José Carlos Pace", "country": "Brazil",
+    "length_km": 4.309, "laps": 71,
+    "lap_record": {"time": "1:10.540", "driver": "Valtteri Bottas", "year": 2018},
+    "corners": [{"number": 1, "type": "medium_speed", "speed": "medium", "overtaking": true}, {"number": 4, "type": "fast_esses", "speed": "high", "overtaking": false}, {"number": 12, "type": "heavy_braking", "speed": "low", "overtaking": true}],
+    "drs_zones": 2, "downforce_level": "medium", "tire_wear": "high", "braking_severity": "medium",
+    "track_evolution": "medium", "surface_type": "abrasive",
+    "key_overtaking_spots": ["Turn 1 Senna S", "Turn 4 Descida do Lago", "Main straight DRS"],
+    "tire_recommendation": "Medium/Hard - short lap but abrasive surface"
+  }
+}

@@ -1,14 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/live';
+const SSE_URL = '/api/live/sse';
+const MAX_WS_RETRIES = 4; // After 4 failures, try SSE
 
-export function useWebSocket({ onMessage, enabled = true }) {
+export function useWebSocket({ onMessage, onModeChange, enabled = true }) {
   const ws = useRef(null);
+  const es = useRef(null);
   const retryTimer = useRef(null);
   const retryCount = useRef(0);
+  const mode = useRef('ws'); // 'ws' | 'sse' | 'offline'
   const onMessageRef = useRef(onMessage);
   const activeRef = useRef(true);
-  // Keep a ref to the connect function so closures can call it safely.
   const connectRef = useRef(null);
 
   // Keep ref updated without causing reconnects
@@ -16,11 +19,50 @@ export function useWebSocket({ onMessage, enabled = true }) {
     onMessageRef.current = onMessage;
   }, [onMessage]);
 
-  const connect = useCallback(() => {
+  // Notify parent of mode changes
+  const setMode = useCallback((newMode) => {
+    if (mode.current !== newMode) {
+      mode.current = newMode;
+      onModeChange?.(newMode);
+      console.debug(`[useWebSocket] mode changed to: ${newMode}`);
+    }
+  }, [onModeChange]);
+
+  const connectEventSource = useCallback(() => {
+    if (!enabled) return;
+
+    try {
+      const sessionKey = new URLSearchParams(window.location.search).get('session_key') || 'latest';
+      es.current = new EventSource(`${SSE_URL}?session_key=${sessionKey}`);
+      setMode('sse');
+
+      es.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onMessageRef.current?.(data);
+        } catch {
+          // Ignore malformed messages.
+        }
+      };
+
+      es.current.onerror = () => {
+        console.debug('[useWebSocket] EventSource error');
+        es.current?.close();
+        setMode('offline');
+        // Don't retry SSE, user is truly offline
+      };
+    } catch (err) {
+      console.debug('[useWebSocket] EventSource setup failed:', err);
+      setMode('offline');
+    }
+  }, [enabled, setMode]);
+
+  const connectWebSocket = useCallback(() => {
     if (!enabled) return;
 
     try {
       ws.current = new WebSocket(WS_URL);
+      setMode('ws');
 
       ws.current.onopen = () => {
         retryCount.current = 0;
@@ -42,38 +84,46 @@ export function useWebSocket({ onMessage, enabled = true }) {
         const delay = Math.round(base * jitter);
         retryCount.current += 1;
         clearTimeout(retryTimer.current);
-        // Only schedule reconnect if still active and enabled
-        if (activeRef.current && enabled) {
-          // Use a ref to the connect function to avoid referencing the `connect`
-          // identifier before it's fully initialized.
-          const fn = connectRef.current || (() => {});
-          retryTimer.current = setTimeout(() => fn(), delay);
+
+        // After MAX_WS_RETRIES, switch to SSE fallback
+        if (retryCount.current >= MAX_WS_RETRIES) {
+          console.debug(`[useWebSocket] WebSocket failed ${retryCount.current} times, switching to SSE`);
+          if (activeRef.current && enabled) {
+            connectEventSource();
+          }
+        } else if (activeRef.current && enabled) {
+          retryTimer.current = setTimeout(() => connectRef.current?.(), delay);
         }
       };
 
       ws.current.onerror = () => {
+        console.debug('[useWebSocket] WebSocket error');
         ws.current?.close();
       };
     } catch {
       // Connection setup failed; retry through the close path.
     }
-  }, [enabled]);
+  }, [enabled, setMode, connectEventSource]);
+
   useEffect(() => {
-    connectRef.current = connect;
-  }, [connect]);
+    connectRef.current = connectWebSocket;
+  }, [connectWebSocket]);
 
   useEffect(() => {
     activeRef.current = true;
-    connect();
+    if (enabled) {
+      connectWebSocket();
+    }
     return () => {
       // Mark as inactive so pending reconnects won't re-schedule
       activeRef.current = false;
       clearTimeout(retryTimer.current);
       try {
         ws.current?.close();
+        es.current?.close();
       } catch {
         // ignore
       }
     };
-  }, [connect]);
+  }, [enabled, connectWebSocket]);
 }

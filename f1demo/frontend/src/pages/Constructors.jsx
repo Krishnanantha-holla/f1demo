@@ -53,9 +53,10 @@ function getCarImageCandidates(teamName) {
 
 
 
-function advanceCarFallback(e, candidates) {
+function advanceCarFallback(e, candidates, setSvgFallback) {
   if (!candidates || candidates.length === 0) {
     e.currentTarget.style.display = 'none';
+    if (setSvgFallback) setSvgFallback(true);
     return;
   }
   const nextIdx = Number(e.currentTarget.dataset.fallbackIdx || '0') + 1;
@@ -65,6 +66,19 @@ function advanceCarFallback(e, candidates) {
     return;
   }
   e.currentTarget.style.display = 'none';
+  if (setSvgFallback) setSvgFallback(true);
+}
+
+function CarSilhouetteSvg({ color }) {
+  return (
+    <svg viewBox="0 0 200 60" className="car-silhouette-svg" aria-hidden="true">
+      <path d="M20 45 Q25 30 50 28 L70 25 Q90 20 120 20 L160 22 Q175 24 180 30 L185 38 Q185 45 180 45 L170 45 Q168 38 162 38 Q156 38 154 45 L60 45 Q58 38 52 38 Q46 38 44 45 Z"
+        fill={color || '#555'} opacity="0.7" />
+      <circle cx="52" cy="45" r="6" fill="#222" stroke={color || '#555'} strokeWidth="1.5" />
+      <circle cx="162" cy="45" r="6" fill="#222" stroke={color || '#555'} strokeWidth="1.5" />
+      <path d="M75 25 L85 15 Q100 12 130 14 L140 20" fill="none" stroke={color || '#555'} strokeWidth="1" opacity="0.5" />
+    </svg>
+  );
 }
 
 function fmtLap(secs) {
@@ -100,6 +114,9 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
   const [detail, setDetail] = useState(null);
   const [driverLapData, setDriverLapData] = useState({});
   const [closing, setClosing] = useState(false);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const color = getTeamColor(team.team_name);
 
@@ -161,6 +178,40 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
     })();
     return () => { cancelled = true; };
   }, [teamDrivers]);
+
+  // Fetch AI summary for constructor (non-blocking) with caching
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setAiLoading(true);
+      setAiError(null);
+      try {
+        const key = `ai_summary:constructor:${(team.team_name || '').replace(/\s+/g, '_')}`;
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.e && Date.now() < parsed.e) {
+              setAiSummary(parsed.v);
+              setAiLoading(false);
+              return;
+            }
+          } catch { /* ignore */ }
+        }
+
+        const res = await api.aiSummary('constructor', team.team_name).catch((e) => { throw e; });
+        if (cancelled) return;
+        if (res && res.summary) {
+          setAiSummary(res.summary);
+          try { localStorage.setItem(key, JSON.stringify({ v: res.summary, e: Date.now() + 1000 * 60 * 60 * 12 })); } catch {}
+        }
+      } catch (e) {
+        console.warn('[TeamProfile] AI summary failed', e);
+        setAiError(e?.message || 'AI unavailable');
+      } finally { if (!cancelled) setAiLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [team.team_name]);
 
   const carCandidates = getCarImageCandidates(team.team_name);
   const carImg = carCandidates[0] || null;
@@ -227,7 +278,9 @@ function TeamProfile({ team, teamDrivers, driverStandings, bios, onClose }) {
           )}
 
           <div className="bio-section">
-            <p className="bio-text">{info.bio || `${team.team_name} currently sits P${team.position_current} in the Constructors' Championship.`}</p>
+            <p className="bio-text">{aiSummary ? aiSummary : (info.bio || `${team.team_name} currently sits P${team.position_current} in the Constructors' Championship.`)}</p>
+            {aiLoading && <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>Generating team summary...</div>}
+            {aiError && <div style={{ marginTop: '0.5rem', color: 'var(--f1-red)' }}>AI summary unavailable: {aiError}</div>}
           </div>
 
           <div className="stats-showcase">
@@ -446,7 +499,7 @@ export default function Constructors() {
                     {teamDrivers.length ? teamDrivers.map(d => d.name_acronym || d.last_name).join(' · ') : 'TBD · TBD'}
                   </div>
                 </div>
-                {carImg && (
+                {carImg ? (
                   <img
                     src={carImg}
                     alt=""
@@ -454,9 +507,19 @@ export default function Constructors() {
                     style={{ objectFit: 'contain', width: '100px', height: '60px', opacity: 0.9, zIndex: 2, marginRight: '-10px' }}
                     loading="lazy"
                     data-fallback-idx="0"
-                    onError={(e) => advanceCarFallback(e, carCandidates)}
+                    onError={(e) => {
+                      advanceCarFallback(e, carCandidates);
+                      // If all candidates exhausted, replace with SVG
+                      if (e.currentTarget.style.display === 'none') {
+                        const svgContainer = e.currentTarget.nextElementSibling;
+                        if (svgContainer) svgContainer.style.display = 'block';
+                      }
+                    }}
                   />
-                )}
+                ) : null}
+                <div style={{ display: carImg ? 'none' : 'block', width: '100px', height: '60px', zIndex: 2 }}>
+                  <CarSilhouetteSvg color={color} />
+                </div>
               </div>
 
               <div className="pilot-card-bot">

@@ -9,8 +9,6 @@ import { PageSkeleton } from './components/Shared';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAppInit } from './hooks/useAppInit';
 
-// Code-split each page — only loads when navigated to
-// Pages with modularized directory structure
 const Dashboard    = lazy(() => import('./pages/dashboard'));
 const Drivers      = lazy(() => import('./pages/Drivers'));
 const Constructors = lazy(() => import('./pages/Constructors'));
@@ -20,6 +18,16 @@ const Analysis     = lazy(() => import('./pages/analysis'));
 const RaceDetail   = lazy(() => import('./pages/raceDetail'));
 const NewsFeed     = lazy(() => import('./pages/NewsFeed'));
 const Settings     = lazy(() => import('./pages/settings'));
+const HeadToHead   = lazy(() => import('./pages/HeadToHead'));
+const DriverStats  = lazy(() => import('./pages/DriverStats'));
+const RacePace     = lazy(() => import('./pages/analysis/RacePace'));
+const PitStops     = lazy(() => import('./pages/PitStops'));
+const PUTracker    = lazy(() => import('./pages/PUTracker'));
+const Results      = lazy(() => import('./pages/Results'));
+const TrackDNA     = lazy(() => import('./pages/TrackDNA'));
+const Consistency  = lazy(() => import('./pages/Consistency'));
+const LiveTrackMap = lazy(() => import('./pages/LiveTrackMap'));
+const AIChat       = lazy(() => import('./pages/AIChat'));
 
 function RoutedContent() {
   const location = useLocation();
@@ -35,6 +43,16 @@ function RoutedContent() {
         <Route path="/race/:meetingKey" element={<ErrorBoundary><RaceDetail /></ErrorBoundary>} />
         <Route path="/news" element={<ErrorBoundary><NewsFeed /></ErrorBoundary>} />
         <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+        <Route path="/head-to-head" element={<ErrorBoundary><HeadToHead /></ErrorBoundary>} />
+        <Route path="/driver-stats" element={<ErrorBoundary><DriverStats /></ErrorBoundary>} />
+        <Route path="/race-pace" element={<ErrorBoundary><RacePace /></ErrorBoundary>} />
+        <Route path="/pit-stops" element={<ErrorBoundary><PitStops /></ErrorBoundary>} />
+        <Route path="/pu-tracker" element={<ErrorBoundary><PUTracker /></ErrorBoundary>} />
+        <Route path="/results" element={<ErrorBoundary><Results /></ErrorBoundary>} />
+        <Route path="/track-dna" element={<ErrorBoundary><TrackDNA /></ErrorBoundary>} />
+        <Route path="/consistency" element={<ErrorBoundary><Consistency /></ErrorBoundary>} />
+        <Route path="/track-map" element={<ErrorBoundary><LiveTrackMap /></ErrorBoundary>} />
+        <Route path="/ai-chat" element={<ErrorBoundary><AIChat /></ErrorBoundary>} />
       </Routes>
     </div>
   );

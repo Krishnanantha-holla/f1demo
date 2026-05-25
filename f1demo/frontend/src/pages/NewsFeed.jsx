@@ -1,13 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
-import DOMPurify from 'dompurify';
-import { api } from '../api';
-import { Loading, ErrorMsg } from '../components/Shared';
+import DOMPurify from "dompurify";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api";
+import { Loading } from "../components/Shared";
 
 function stripHtml(html) {
-  if (!html) return '';
+  if (!html) return "";
   const clean = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
-  const doc = new DOMParser().parseFromString(clean, 'text/html');
-  return doc.body.textContent || '';
+  const doc = new DOMParser().parseFromString(clean, "text/html");
+  return doc.body.textContent || "";
 }
 
 function timeAgo(dateStr) {
@@ -28,7 +28,7 @@ function timeAgo(dateStr) {
   return "just now";
 }
 
-function NewsCard({ article, index }) {
+function NewsCard({ article, index, onOpen }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const cardRef = useRef(null);
@@ -37,10 +37,10 @@ function NewsCard({ article, index }) {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          entry.target.classList.add('news-card-visible');
+          entry.target.classList.add("news-card-visible");
         }
       },
-      { threshold: 0.1, rootMargin: '50px' }
+      { threshold: 0.1, rootMargin: "50px" },
     );
 
     if (cardRef.current) {
@@ -51,35 +51,34 @@ function NewsCard({ article, index }) {
   }, []);
 
   const sourceColors = {
-    'Autosport': '#E10600',
-    'Motorsport.com': '#FF6B00',
-    'RaceFans': '#00D26A',
-    'PlanetF1': '#3B82F6',
-    'Crash.net': '#E31B23',
-    'GPFans': '#FF8C00',
-    'Sky Sports F1': '#0072CE',
-    'BBC Sport F1': '#F5C400',
-    'Formula1.com': '#E10600',
+    Autosport: "#E10600",
+    "Motorsport.com": "#FF6B00",
+    RaceFans: "#00D26A",
+    PlanetF1: "#3B82F6",
+    "Crash.net": "#E31B23",
+    GPFans: "#FF8C00",
+    "Sky Sports F1": "#0072CE",
+    "BBC Sport F1": "#F5C400",
+    "Formula1.com": "#E10600",
   };
 
-  const sourceColor = sourceColors[article.source] || '#888';
+  const sourceColor = sourceColors[article.source] || "#888";
   const summary = stripHtml(article.summary);
 
   return (
-    <a
+    <button
       ref={cardRef}
-      href={article.link}
-      target="_blank"
-      rel="noopener noreferrer"
+      type="button"
       className="news-card-modern"
-      style={{ '--delay': `${Math.min(index * 0.05, 1)}s` }}
+      style={{ "--delay": `${Math.min(index * 0.05, 1)}s` }}
+      onClick={() => onOpen && onOpen(article)}
     >
       {article.image && !imageError && (
         <div className="news-card-image-wrapper">
           <img
             src={article.image}
             alt={article.title}
-            className={`news-card-image ${imageLoaded ? 'loaded' : ''}`}
+            className={`news-card-image ${imageLoaded ? "loaded" : ""}`}
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
             loading="lazy"
@@ -99,30 +98,45 @@ function NewsCard({ article, index }) {
 
         <h3 className="news-card-title">{article.title}</h3>
 
-        {summary && (
-          <p className="news-card-summary">{summary}</p>
-        )}
+        {summary && <p className="news-card-summary">{summary}</p>}
 
         <div className="news-card-footer">
           <span className="news-read-more">
             Read article
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </span>
         </div>
       </div>
 
-      <div className="news-card-glow" style={{ '--glow-color': sourceColor }} />
-    </a>
+      <div className="news-card-glow" style={{ "--glow-color": sourceColor }} />
+    </button>
   );
 }
 
 export default function NewsFeed() {
   const [news, setNews] = useState([]);
-  const [status, setStatus] = useState('loading');
-  const [filter, setFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [modalArticle, setModalArticle] = useState(null);
+  const [status, setStatus] = useState("loading");
+  const [filter, setFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleArticleOpen = (article) => {
+    const mode = localStorage.getItem('newsOpenMode') || 'in-app';
+    if (mode === 'new-tab') {
+      window.open(article.link, '_blank', 'noopener');
+    } else {
+      setModalArticle(article);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -133,32 +147,37 @@ export default function NewsFeed() {
         if (cancelled) return;
 
         if (!data || data.length === 0) {
-          setStatus('empty');
+          setStatus("empty");
         } else {
           setNews(data);
-          setStatus('ok');
+          setStatus("ok");
         }
       } catch (e) {
         console.error("News feed error:", e);
-        if (!cancelled) setStatus('error');
+        if (!cancelled) setStatus("error");
       }
     }
 
     loadNews();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const sources = [...new Set(news.map(n => n.source))].sort();
+  const sources = [...new Set(news.map((n) => n.source))].sort();
 
-  const filteredNews = news.filter(article => {
-    const matchesFilter = filter === 'all' || article.source === filter;
-    const matchesSearch = !searchQuery ||
+  const filteredNews = news.filter((article) => {
+    const matchesFilter = filter === "all" || article.source === filter;
+    const matchesSearch =
+      !searchQuery ||
       article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      stripHtml(article.summary).toLowerCase().includes(searchQuery.toLowerCase());
+      stripHtml(article.summary)
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="news-page-modern">
         <div className="news-header-modern">
@@ -166,7 +185,9 @@ export default function NewsFeed() {
             <div className="news-header-icon">📰</div>
             <div>
               <h1 className="news-title-modern">Latest F1 News</h1>
-              <p className="news-subtitle-modern">Real-time updates from top motorsport sources</p>
+              <p className="news-subtitle-modern">
+                Real-time updates from top motorsport sources
+              </p>
             </div>
           </div>
         </div>
@@ -175,7 +196,7 @@ export default function NewsFeed() {
     );
   }
 
-  if (status === 'error') {
+  if (status === "error") {
     return (
       <div className="news-page-modern">
         <div className="news-header-modern">
@@ -183,7 +204,9 @@ export default function NewsFeed() {
             <div className="news-header-icon">📰</div>
             <div>
               <h1 className="news-title-modern">Latest F1 News</h1>
-              <p className="news-subtitle-modern">Real-time updates from top motorsport sources</p>
+              <p className="news-subtitle-modern">
+                Real-time updates from top motorsport sources
+              </p>
             </div>
           </div>
         </div>
@@ -191,7 +214,10 @@ export default function NewsFeed() {
           <div className="news-error-icon">⚠️</div>
           <h3>Unable to load news</h3>
           <p>Check your connection and try refreshing the page</p>
-          <button className="news-retry-btn" onClick={() => window.location.reload()}>
+          <button
+            className="news-retry-btn"
+            onClick={() => window.location.reload()}
+          >
             Retry
           </button>
         </div>
@@ -199,7 +225,7 @@ export default function NewsFeed() {
     );
   }
 
-  if (status === 'empty') {
+  if (status === "empty") {
     return (
       <div className="news-page-modern">
         <div className="news-header-modern">
@@ -207,7 +233,9 @@ export default function NewsFeed() {
             <div className="news-header-icon">📰</div>
             <div>
               <h1 className="news-title-modern">Latest F1 News</h1>
-              <p className="news-subtitle-modern">Real-time updates from top motorsport sources</p>
+              <p className="news-subtitle-modern">
+                Real-time updates from top motorsport sources
+              </p>
             </div>
           </div>
         </div>
@@ -228,37 +256,51 @@ export default function NewsFeed() {
           <div>
             <h1 className="news-title-modern">Latest F1 News</h1>
             <p className="news-subtitle-modern">
-              {filteredNews.length} {filteredNews.length === 1 ? 'article' : 'articles'} from {sources.length} sources
+              {filteredNews.length}{" "}
+              {filteredNews.length === 1 ? "article" : "articles"} from{" "}
+              {sources.length} sources
             </p>
           </div>
         </div>
 
         <div className="news-controls">
           <div className="news-search">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.35-4.35"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
             </svg>
             <input
               type="text"
               placeholder="Search news..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
             {searchQuery && (
-              <button className="news-search-clear" onClick={() => setSearchQuery('')}>✕</button>
+              <button
+                className="news-search-clear"
+                onClick={() => setSearchQuery("")}
+              >
+                ✕
+              </button>
             )}
           </div>
 
           <select
             className="news-filter"
             value={filter}
-            onChange={e => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value)}
           >
             <option value="all">All Sources ({news.length})</option>
-            {sources.map(source => (
+            {sources.map((source) => (
               <option key={source} value={source}>
-                {source} ({news.filter(n => n.source === source).length})
+                {source} ({news.filter((n) => n.source === source).length})
               </option>
             ))}
           </select>
@@ -274,8 +316,68 @@ export default function NewsFeed() {
       ) : (
         <div className="news-grid-modern">
           {filteredNews.map((article, i) => (
-            <NewsCard key={article.link} article={article} index={i} />
+            <NewsCard
+              key={article.link}
+              article={article}
+              index={i}
+              onOpen={handleArticleOpen}
+            />
           ))}
+        </div>
+      )}
+      {/* Article modal (in-app) */}
+      {modalArticle && (
+        <div
+          className="news-modal-backdrop"
+          onClick={() => setModalArticle(null)}
+        >
+          <div
+            className="news-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+          >
+            <button
+              className="modal-close"
+              onClick={() => setModalArticle(null)}
+            >
+              ✕
+            </button>
+            {modalArticle.image && (
+              <img
+                src={modalArticle.image}
+                alt=""
+                className="news-modal-image"
+              />
+            )}
+            <div className="news-modal-meta">
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                {modalArticle.source} • {timeAgo(modalArticle.published)}
+              </div>
+              <h2 style={{ marginTop: "0.5rem" }}>{modalArticle.title}</h2>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <p>
+                {stripHtml(modalArticle.summary) || "No preview available."}
+              </p>
+            </div>
+            <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
+              <button
+                onClick={() =>
+                  window.open(modalArticle.link, "_blank", "noopener")
+                }
+                className="cal-more-btn"
+              >
+                Open original
+              </button>
+              <button
+                onClick={() => setModalArticle(null)}
+                className="cal-more-btn"
+                style={{ background: "var(--border)" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

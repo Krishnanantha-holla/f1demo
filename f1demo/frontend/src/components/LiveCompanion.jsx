@@ -27,17 +27,26 @@ export default function LiveCompanion() {
   const [liveData, setLiveData] = useState(null);
   const [countdown, setCountdown] = useState('');
   const [activeAlert, setActiveAlert] = useState(null);
-  const alertTimer = useRef(null);
-  const prevRCRef = useRef('');
+    const [wsMode, setWsMode] = useState('ws'); // 'ws' | 'sse' | 'offline'
+    const [latency, setLatency] = useState(null); // ms
+    const alertTimer = useRef(null);
+    const prevRCRef = useRef('');
 
   const isLive = sessionMode === 'live';
 
   const handleMessage = useCallback((data) => {
     if (data?.error) return;
     setLiveData(data);
-  }, []);
+    
+      // Phase H.3: Latency tracking - compute from timestamp if available
+      if (data?.timestamp) {
+        const latencyMs = Date.now() - new Date(data.timestamp).getTime();
+        setLatency(latencyMs);
+        console.debug(`[LiveCompanion] latency: ${latencyMs}ms`, { mode: wsMode });
+      }
+    }, [wsMode]);
 
-  useWebSocket({ onMessage: handleMessage, enabled: isLive });
+    useWebSocket({ onMessage: handleMessage, onModeChange: setWsMode, enabled: isLive });
 
   const driverMap = useMemo(() => {
     const map = {};
@@ -188,8 +197,8 @@ export default function LiveCompanion() {
           )}
 
           <div className="lc-footer">
-            <span>Updates every 8s</span>
-            <span className="lc-source">OpenF1</span>
+            <span>Updates every 8s{latency != null ? ` · ${(latency / 1000).toFixed(1)}s ago` : ''}</span>
+            <span className="lc-source">OpenF1{wsMode !== 'ws' ? ` (${wsMode})` : ''}</span>
           </div>
         </div>
       )}

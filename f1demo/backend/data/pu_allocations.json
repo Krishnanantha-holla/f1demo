@@ -1,0 +1,34 @@
+{
+  "total_races": 24,
+  "allocations": {
+    "ICE": 4,
+    "TC": 4,
+    "MGU_H": 4,
+    "MGU_K": 4,
+    "ES": 2,
+    "CE": 2,
+    "GBX": 4
+  },
+  "drivers": [
+    {"driver": "VER", "team": "Red Bull Racing"},
+    {"driver": "PER", "team": "Red Bull Racing"},
+    {"driver": "HAM", "team": "Ferrari"},
+    {"driver": "LEC", "team": "Ferrari"},
+    {"driver": "NOR", "team": "McLaren"},
+    {"driver": "PIA", "team": "McLaren"},
+    {"driver": "RUS", "team": "Mercedes"},
+    {"driver": "ANT", "team": "Mercedes"},
+    {"driver": "ALO", "team": "Aston Martin"},
+    {"driver": "STR", "team": "Aston Martin"},
+    {"driver": "GAS", "team": "Alpine"},
+    {"driver": "DOO", "team": "Alpine"},
+    {"driver": "TSU", "team": "RB"},
+    {"driver": "HAD", "team": "RB"},
+    {"driver": "ALB", "team": "Williams"},
+    {"driver": "SAI", "team": "Williams"},
+    {"driver": "HUL", "team": "Sauber"},
+    {"driver": "BOR", "team": "Sauber"},
+    {"driver": "OCO", "team": "Haas"},
+    {"driver": "BEA", "team": "Haas"}
+  ]
+}

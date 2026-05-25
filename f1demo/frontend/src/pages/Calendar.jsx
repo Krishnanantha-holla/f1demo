@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { getCircuitData } from '../circuitData';
-import { Loading, ErrorMsg } from '../components/Shared';
+import { Loading, ErrorMsg, RetryPanel } from '../components/Shared';
 import { formatDate } from '../utils/sharedUtils';
 
 // ── Helper: rotate point for track map ──
@@ -232,8 +232,9 @@ export default function Calendar() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    async function fetchAll() {
       try {
+        setStatus('loading');
         const [m, driverData] = await Promise.all([
           api.meetings(),
           api.drivers().catch((err) => { console.warn('[Calendar] drivers failed', err); return []; }),
@@ -259,7 +260,6 @@ export default function Calendar() {
                 (a, b) => new Date(a.date_start) - new Date(b.date_start)
               );
 
-              // Fetch circuit map
               if (mtg.circuit_key) {
                 try {
                   const md = await api.circuitMap(mtg.circuit_key, mtg.year);
@@ -267,7 +267,6 @@ export default function Calendar() {
                 } catch { /* ignore circuit map errors */ }
               }
 
-              // For past races, fetch podium results
               const endDate = s.length
                 ? s[s.length - 1].date_end || s[s.length - 1].date_start
                 : mtg.date_start;
@@ -300,7 +299,9 @@ export default function Calendar() {
         console.error('[Calendar] load failed', err);
         if (!cancelled) setStatus('error');
       }
-    })();
+    }
+
+    fetchAll();
     return () => { cancelled = true; };
   }, []);
 
@@ -347,7 +348,20 @@ export default function Calendar() {
       </div>
 
       {status === 'loading' && <Loading text="Loading calendar..." />}
-      {status === 'error' && <ErrorMsg text="Failed to load calendar." />}
+      {status === 'error' && (
+        <RetryPanel text={'Network error when attempting to fetch calendar.'} onRetry={() => {
+          setStatus('loading');
+          // rerun effect by calling fetch via a minimal force state change
+          (async () => { try { const resp = await api.meetings(); setStatus('loading'); window.location.reload(); } catch (e) { setStatus('error'); } })();
+        }} onDemo={() => {
+          // load a minimal demo calendar
+          setMeetings([{ meeting_key: 'demo1', meeting_name: 'Demo Grand Prix', location: 'Demo City', country_name: 'Nowhere', date_start: new Date().toISOString(), circuit_key: null }]);
+          setSessions({});
+          setResults({});
+          setMapDataByKey({});
+          setStatus('ok');
+        }} />
+      )}
       {status === 'ok' && (
         <>
           {/* Season progress bar */}

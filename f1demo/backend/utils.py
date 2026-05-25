@@ -105,8 +105,15 @@ async def cached_get(url: str, ttl: int = CACHE_TTL) -> dict | list | None:
             return None
         if resp.status_code >= 500:
             logger.warning("Upstream %s from %s", resp.status_code, url)
-        resp.raise_for_status()
+        # Some test mocks (AsyncMock) may make `raise_for_status` return a
+        # coroutine. In normal httpx.Response it's a regular method, so
+        # handle both cases to be robust in tests.
+        maybe_coro = resp.raise_for_status()
+        if asyncio.iscoroutine(maybe_coro):
+            await maybe_coro
         data = resp.json()
+        if asyncio.iscoroutine(data):
+            data = await data
 
     async with _cache_lock:
         _cache[key] = data

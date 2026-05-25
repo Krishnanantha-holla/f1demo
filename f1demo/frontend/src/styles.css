@@ -226,12 +226,13 @@ body::before {
 }
 
 /* ── Main ── */
-.app-layout { display: flex; flex: 1; min-height: 100vh; }
+.app-layout { display: flex; flex: 1; min-height: 100vh; overflow: hidden; }
 .main-wrapper {
   margin-left: 180px;
   flex: 1;
-  min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   height: 100vh;
 }
 
@@ -239,6 +240,7 @@ main {
   max-width: 1400px;
   margin: 0 auto;
   padding: 1.5rem 2rem;
+  overflow-x: hidden;
 }
 
 /* ── Page Header ── */
@@ -275,6 +277,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  min-width: 0;
   animation: cardEntrance 0.6s var(--ease-out-expo) both;
   transition: all 0.3s var(--ease-out-expo);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -284,7 +287,7 @@ main {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 .card-header {
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -293,13 +296,16 @@ main {
 }
 .card-title { font-size: 1rem; font-weight: 800; letter-spacing: 0.5px; }
 .card-badge { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; background: rgba(255,255,255,0.05); padding: 0.2rem 0.5rem; border-radius: 4px; }
-.card-body { padding: 0; }
+.card-body { padding: 1rem 1.25rem; overflow: hidden; max-height: 500px; overflow-y: auto; }
+.card-body::-webkit-scrollbar { width: 4px; }
+.card-body::-webkit-scrollbar-track { background: transparent; }
+.card-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 /* ── Data Table ── */
-.data-table { width: 100%; border-collapse: collapse; }
+.data-table { width: 100%; border-collapse: collapse; table-layout: fixed; overflow-wrap: break-word; }
 .data-table th {
   text-align: left;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 0.75rem;
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -308,9 +314,12 @@ main {
   font-weight: 700;
 }
 .data-table td {
-  padding: 0.55rem 1rem;
+  padding: 0.55rem 0.75rem;
   border-bottom: 1px solid rgba(37,37,53,0.6);
   font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr {
@@ -335,27 +344,36 @@ main {
 .top-row {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
-  gap: 1.25rem;
-  margin-bottom: 1.25rem;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
   align-items: start;
 }
 .top-row-left {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 .standings-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  margin-bottom: 1.25rem;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 .bottom-dashboard-grid {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
-  gap: 1.25rem;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
   align-items: start;
 }
+
+/* ── Dashboard 4-pane grid ── */
+.dash-grid-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 768px) { .dash-grid-4 { grid-template-columns: 1fr; } }
 
 /* ── Next Race ── */
 .next-race-card {
@@ -478,7 +496,10 @@ main {
   line-height: 1.5;
 }
 .enhanced-calendar-grid {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .dash-podium.refined {
   gap: 0.85rem;
@@ -494,11 +515,18 @@ main {
 /* ── Dashboard Calendar Mini ── */
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.75rem;
-  padding: 1.25rem;
+  padding: 0;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
   align-items: start;
+  contain: inline-size;
 }
+.calendar-grid::-webkit-scrollbar { width: 4px; }
+.calendar-grid::-webkit-scrollbar-track { background: transparent; }
+.calendar-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .race-event {
   background: rgba(255,255,255,0.02);
   border: 1px solid var(--border);
@@ -670,8 +698,8 @@ main {
 /* ── Driver/Constructor Page Grid ── */
 .drivers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem;
   align-items: start;
 }
 .driver-card {
@@ -1422,6 +1450,16 @@ main {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .error-msg { color: var(--f1-red); text-align: center; padding: 1.5rem; font-size: 0.85rem; animation: fadeIn 0.3s ease both; }
+.retry-panel {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  animation: fadeIn 0.3s ease both;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: rgba(225, 6, 0, 0.03);
+}
 .empty-msg { color: var(--text-muted); text-align: center; padding: 1.5rem; font-size: 0.85rem; }
 
 /* ── Responsive ── */
@@ -2818,8 +2856,8 @@ main {
    ═══════════════════════════════════════ */
 .pilot-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem;
 }
 
 .pilot-card {
@@ -2891,6 +2929,10 @@ main {
 }
 .pilot-card-img {
   flex-shrink: 0;
+}
+.car-silhouette-svg {
+  width: 100%;
+  height: 100%;
 }
 .pilot-card-bot {
   position: relative;
@@ -4078,3 +4120,120 @@ html { scroll-behavior: smooth; }
   background: rgba(255, 30, 0, 0.35);
   color: #fff;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   NEW PAGES: Head-to-Head, Driver Stats, Race Pace, Pit Stops,
+   PU Tracker, Results, Track DNA, Consistency, Live Track Map
+   ═══════════════════════════════════════════════════════════════ */
+
+.page-container { padding: 0; max-width: 100%; overflow-x: hidden; }
+.page-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
+.page-subtitle { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1rem; }
+
+/* Head-to-Head */
+.h2h-controls { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.h2h-controls select { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.85rem; }
+.h2h-vs { font-weight: 700; font-size: 0.9rem; color: var(--text-dim); }
+.h2h-header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+.h2h-driver-name { font-size: 1.3rem; font-weight: 700; }
+.h2h-stat-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.h2h-val { font-size: 0.85rem; font-weight: 600; min-width: 2.5rem; text-align: center; }
+.h2h-bars { flex: 1; display: flex; align-items: center; gap: 0.25rem; position: relative; }
+.h2h-bar-left { height: 6px; border-radius: 3px; transition: width 0.3s; }
+.h2h-bar-right { height: 6px; border-radius: 3px; transition: width 0.3s; }
+.h2h-label { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; min-width: 5rem; text-align: center; }
+.h2h-chart { width: 100%; max-height: 220px; }
+
+/* Stats Grid */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; text-align: center; }
+.stat-card-value { font-size: 1.75rem; font-weight: 700; color: var(--accent); }
+.stat-card-label { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.3rem; }
+.stat-card-sub { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.2rem; }
+.stats-chart { width: 100%; max-height: 200px; }
+
+/* Driver filter chips */
+.driver-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+.filter-chip { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-dim); padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
+.filter-chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.filter-chip:hover { border-color: var(--accent); }
+
+/* Compound legend & badges */
+.compound-legend { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--text-dim); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.compound-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: #000; }
+
+/* Pit Stops bar chart */
+.pit-bar-chart { display: flex; flex-direction: column; gap: 0.5rem; }
+.pit-bar-row { display: flex; align-items: center; gap: 0.5rem; }
+.pit-bar-label { font-size: 0.8rem; min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pit-bar-track { flex: 1; height: 18px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+.pit-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.pit-bar-value { font-size: 0.8rem; font-weight: 600; min-width: 3rem; text-align: right; }
+
+/* Highlight card */
+.highlight-card { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; }
+.highlight-label { font-size: 0.85rem; color: var(--text-dim); }
+.highlight-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+.highlight-sub { font-size: 0.8rem; color: var(--text-dim); }
+
+/* PU Tracker */
+.pu-table td, .pu-table th { text-align: center; padding: 0.4rem 0.5rem; font-size: 0.8rem; }
+.risk-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; color: #000; }
+
+/* Track DNA */
+.track-dna-header { margin-bottom: 1rem; }
+.track-dna-header h2 { font-size: 1.2rem; margin-bottom: 0.25rem; }
+.track-dna-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 700px) { .track-dna-grid { grid-template-columns: 1fr; } }
+.level-bar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.level-bar-label { font-size: 0.8rem; min-width: 100px; }
+.level-bar-dots { display: flex; gap: 4px; }
+.level-dot { width: 12px; height: 12px; border-radius: 50%; }
+.level-bar-text { font-size: 0.75rem; color: var(--text-dim); text-transform: capitalize; }
+.track-meta { margin-top: 1rem; font-size: 0.85rem; }
+.track-meta p { margin-bottom: 0.3rem; }
+.lap-record { text-align: center; padding: 0.5rem; }
+.lap-record-time { display: block; font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+.lap-record-driver { font-size: 0.8rem; color: var(--text-dim); }
+.overtaking-list { list-style: none; padding: 0; }
+.overtaking-list li { font-size: 0.85rem; margin-bottom: 0.3rem; }
+
+/* Live Track Map */
+.track-map-card { text-align: center; }
+.track-map-svg { width: 100%; max-height: 400px; background: rgba(0,0,0,0.3); border-radius: 8px; }
+.track-map-legend { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.75rem; }
+.track-legend-item { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; }
+
+/* ═══════════════════════════════════════
+   AI Chat & Analysis Panel
+   ═══════════════════════════════════════ */
+.ai-chat-container { display: flex; flex-direction: column; height: 70vh; max-height: 600px; }
+.ai-chat-messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.ai-chat-empty { text-align: center; color: var(--text-dim); padding: 2rem 1rem; }
+.ai-chat-empty p { margin-bottom: 1rem; }
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+.ai-suggestion-chip { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.75rem; border-radius: 16px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.ai-suggestion-chip:hover { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+.ai-msg { max-width: 85%; }
+.ai-msg-user { align-self: flex-end; }
+.ai-msg-assistant { align-self: flex-start; }
+.ai-msg-label { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.2rem; font-weight: 600; }
+.ai-msg-user .ai-msg-label { text-align: right; }
+.ai-msg-content { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px; padding: 0.6rem 0.9rem; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; }
+.ai-msg-user .ai-msg-content { background: rgba(var(--accent-rgb, 99,102,241), 0.15); border-color: var(--accent); }
+.ai-typing { opacity: 0.6; font-style: italic; }
+.ai-chat-input-row { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+.ai-chat-input { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; color: var(--text); font-size: 0.85rem; resize: none; font-family: inherit; }
+.ai-chat-input:focus { outline: none; border-color: var(--accent); }
+.ai-send-btn { background: var(--accent); border: none; border-radius: 8px; padding: 0.5rem 0.75rem; cursor: pointer; color: #fff; display: flex; align-items: center; }
+.ai-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* AI Analysis Panel */
+.ai-panel { margin-top: 1rem; }
+.ai-generate-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.ai-generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-placeholder { color: var(--text-dim); font-size: 0.85rem; font-style: italic; }
+.ai-error { color: #ff6b6b; font-size: 0.85rem; }
+.ai-analysis-text { font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; }

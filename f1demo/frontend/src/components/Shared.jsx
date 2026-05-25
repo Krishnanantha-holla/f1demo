@@ -17,6 +17,18 @@ export function EmptyMsg({ text = 'No data available.' }) {
   return <div className="empty-msg">{text}</div>;
 }
 
+export function RetryPanel({ text = 'Network error — resource unavailable.', onRetry, onDemo }) {
+  return (
+    <div className="retry-panel" role="alert">
+      <div style={{ marginBottom: '0.75rem' }}>{text}</div>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <button className="cal-more-btn" onClick={onRetry}>Retry</button>
+        {onDemo && <button className="cal-more-btn" onClick={onDemo} style={{ background: 'var(--border)' }}>Use demo data</button>}
+      </div>
+    </div>
+  );
+}
+
 export function Skeleton({ width = '100%', height = '1rem', radius = '6px', style }) {
   return (
     <span

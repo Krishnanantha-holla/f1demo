@@ -21,10 +21,19 @@ function getInitialPollInterval() {
   }
 }
 
+function getInitialNewsMode() {
+  try {
+    return localStorage.getItem('newsOpenMode') || 'in-app';
+  } catch {
+    return 'in-app';
+  }
+}
+
 export default function SettingsPage() {
   const { requestPermission, permissionGranted } = useNotifications();
   const [theme, setTheme] = useState(getInitialTheme);
   const [pollInterval, setPollInterval] = useState(getInitialPollInterval);
+  const [newsMode, setNewsMode] = useState(getInitialNewsMode);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     try {
       const saved = localStorage.getItem('notificationsEnabled');
@@ -49,6 +58,10 @@ export default function SettingsPage() {
   }, [pollInterval]);
 
   useEffect(() => {
+    localStorage.setItem('newsOpenMode', newsMode);
+  }, [newsMode]);
+
+  useEffect(() => {
     localStorage.setItem('notificationsEnabled', String(notificationsEnabled));
   }, [notificationsEnabled]);
 
@@ -61,6 +74,7 @@ export default function SettingsPage() {
     localStorage.removeItem('theme');
     localStorage.removeItem('livePollIntervalSeconds');
     localStorage.removeItem('notificationsEnabled');
+    localStorage.removeItem('newsOpenMode');
     window.location.reload();
   };
 
@@ -77,13 +91,21 @@ export default function SettingsPage() {
           <span className="settings-label">Theme</span>
           <select value={theme} onChange={(e) => setTheme(e.target.value)}>
             {THEMES.map((option) => (
-              <option key={option} value={option}>{option}</option>
+              <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
             ))}
           </select>
         </label>
 
         <label className="settings-card">
-          <span className="settings-label">Live poll interval: {pollInterval}s</span>
+          <span className="settings-label">News articles open in</span>
+          <select value={newsMode} onChange={(e) => setNewsMode(e.target.value)}>
+            <option value="in-app">In-app modal</option>
+            <option value="new-tab">New tab</option>
+          </select>
+        </label>
+
+        <label className="settings-card">
+          <span className="settings-label">Live telemetry poll interval: {pollInterval}s</span>
           <input
             type="range"
             min="5"

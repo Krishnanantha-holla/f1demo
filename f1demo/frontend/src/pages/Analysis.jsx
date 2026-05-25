@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api, getTeamColor } from '../api';
-import { Loading, ErrorMsg } from '../components/Shared';
+import { Loading, ErrorMsg, RetryPanel } from '../components/Shared';
 import SessionSelector from '../components/SessionSelector';
 import LapDeltaChart from '../components/LapDeltaChart';
 import PaceStrip from '../components/PaceStrip';
@@ -759,7 +759,7 @@ export default function Analysis() {
       {status === 'error' && (
         <div className="card" style={{ marginBottom: '1.25rem' }}>
           <div className="card-body" style={{ padding: '2rem', textAlign: 'center' }}>
-            <ErrorMsg text="Unable to load this session yet. Some datasets become available shortly after the session ends." />
+            <RetryPanel text="Unable to load this session yet. Some datasets become available shortly after the session ends." onRetry={loadData} />
           </div>
         </div>
       )}
